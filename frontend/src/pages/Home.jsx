@@ -13,7 +13,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
 const ALL_GRADES = ['1학년', '2학년', '3학년', '4학년'];
 const ALL_TAGS = ['공모전', '해커톤', '스터디', '프로젝트', '장학/취업'];
-const NOTICE_COLOR = '#ef4444';
+const NOTICE_COLOR = '#f8927d';
 
 const EVENTS_DATA = [
   {
@@ -351,7 +351,7 @@ function AgendaCard({ event, isLast, onDetail }) {
   return (
     <div>
       <button
-        className="group flex w-full gap-3 rounded-lg py-4 text-left transition-colors hover:bg-indigo-50/60"
+        className="group flex w-full gap-3 rounded-lg py-4 text-left transition-colors hover:bg-primary-50/60"
         onClick={onDetail}
       >
         <div className="w-1 shrink-0 rounded-full self-stretch" style={{ backgroundColor: event.backgroundColor }} />
@@ -391,7 +391,7 @@ function AgendaCard({ event, isLast, onDetail }) {
             ))}
           </div>
         </div>
-        <div className="flex shrink-0 items-center text-gray-300 transition-colors group-hover:text-indigo-400">
+        <div className="flex shrink-0 items-center text-gray-300 transition-colors group-hover:text-primary-400">
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
@@ -420,7 +420,7 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, showNoticeOnly, onG
       <p className="mb-4 text-xs text-gray-400">표시할 캘린더를 선택하세요.</p>
 
       <div className="mb-4">
-        <p className="mb-2.5 text-[10px] font-bold uppercase tracking-widest text-indigo-600">공지</p>
+        <p className="mb-2.5 text-[10px] font-bold uppercase tracking-widest text-primary-500">공지</p>
         <button
           onClick={() => onNoticeChange((prev) => !prev)}
           className={`rounded-full border px-3 py-1 text-xs font-semibold transition-all active:scale-95 ${
@@ -436,14 +436,14 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, showNoticeOnly, onG
       <div className="mb-4 h-px bg-gray-100" />
 
       <div className="mb-4">
-        <p className="mb-2.5 text-[10px] font-bold uppercase tracking-widest text-indigo-600">학년</p>
+        <p className="mb-2.5 text-[10px] font-bold uppercase tracking-widest text-primary-500">학년</p>
         <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
           <label className="flex cursor-pointer select-none items-center gap-2">
             <input
               type="checkbox"
               checked={selectedGrades.length === 0}
               onChange={() => onGradeChange([])}
-              className="h-4 w-4 accent-indigo-600"
+              className="h-4 w-4 accent-primary-500"
             />
             <span className="text-sm text-gray-600">전체</span>
           </label>
@@ -460,7 +460,7 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, showNoticeOnly, onG
                     return next.length === ALL_GRADES.length ? [] : next;
                   })
                 }
-                className="h-4 w-4 accent-indigo-600"
+                className="h-4 w-4 accent-primary-500"
               />
               <span className="text-sm text-gray-600">{grade}</span>
             </label>
@@ -471,7 +471,7 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, showNoticeOnly, onG
       <div className="mb-4 h-px bg-gray-100" />
 
       <div>
-        <p className="mb-2.5 text-[10px] font-bold uppercase tracking-widest text-indigo-600">태그</p>
+        <p className="mb-2.5 text-[10px] font-bold uppercase tracking-widest text-primary-500">태그</p>
         <div className="flex flex-wrap gap-2">
           {ALL_TAGS.map((tag) => {
             const isSelected = selectedTags.includes(tag);
@@ -512,7 +512,7 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, showNoticeOnly, onG
             onTagChange([]);
             onNoticeChange(false);
           }}
-          className="mt-4 w-full rounded-lg border border-indigo-200 py-2 text-xs font-semibold text-indigo-600 transition-all hover:bg-indigo-50 hover:text-indigo-800"
+          className="mt-4 w-full rounded-lg border border-primary-200 py-2 text-xs font-semibold text-primary-500 transition-all hover:bg-primary-50 hover:text-primary-700"
         >
           필터 초기화
         </button>
@@ -816,7 +816,7 @@ export default function Home() {
     <div className="flex h-screen flex-col overflow-hidden bg-white">
       <header className="z-10 flex h-16 shrink-0 items-center justify-between border-b border-gray-100 bg-white px-6">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 shadow-sm">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-500 shadow-sm">
             <span className="text-sm font-extrabold text-white">C</span>
           </div>
           <span className="text-xl font-extrabold tracking-tight text-gray-800">COM:HUB</span>
@@ -827,23 +827,23 @@ export default function Home() {
             <>
               <button
                 onClick={() => setIsAddModalOpen(true)}
-                className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-700 active:scale-95"
+                className="flex items-center gap-1.5 rounded-lg bg-primary-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-primary-600 active:scale-95"
               >
                 <span className="text-base leading-none">+</span>
                 <span>새 일정 등록</span>
               </button>
               <button
                 onClick={() => navigate('/profile')}
-                className="flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1.5 transition-all hover:bg-indigo-100 active:scale-95"
+                className="flex items-center gap-2 rounded-full bg-primary-50 px-3 py-1.5 transition-all hover:bg-primary-100 active:scale-95"
               >
-                <div className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-indigo-200">
+                <div className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-primary-200">
                   {user.profileImage ? (
                     <img src={user.profileImage} alt="프로필" className="h-full w-full object-cover" />
                   ) : (
-                    <span className="text-xs font-bold text-indigo-700">{user.name?.charAt(0)}</span>
+                    <span className="text-xs font-bold text-primary-600">{user.name?.charAt(0)}</span>
                   )}
                 </div>
-                <span className="text-sm font-semibold text-indigo-800">{user.name}님</span>
+                <span className="text-sm font-semibold text-primary-700">{user.name}님</span>
               </button>
               <button
                 onClick={handleLogout}
@@ -855,7 +855,7 @@ export default function Home() {
           ) : (
             <button
               onClick={() => navigate('/login')}
-              className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-700 active:scale-95"
+              className="rounded-lg bg-primary-500 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-primary-600 active:scale-95"
             >
               로그인
             </button>
@@ -955,7 +955,7 @@ export default function Home() {
           {panelView === 'list' ? (
             <div className="flex h-full flex-col overflow-hidden">
               <div className="shrink-0 border-b border-gray-200 bg-gray-50 px-6 pb-4 pt-6">
-                <p className="mb-1 text-xs font-bold uppercase tracking-widest text-indigo-500">
+                <p className="mb-1 text-xs font-bold uppercase tracking-widest text-primary-500">
                   Daily Agenda
                 </p>
                 <h2 className="text-2xl font-extrabold leading-tight text-gray-800">

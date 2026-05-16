@@ -1,4 +1,13 @@
 @import "tailwindcss";
+@import url('https://cdn.jsdelivr.net/gh/sun-typeface/SUIT/fonts/variable/woff2/SUIT-Variable.css');
+
+* {
+  font-family: 'SUIT Variable', 'SUIT', -apple-system, sans-serif;
+}
+
+body {
+  font-weight: 400;
+}
 
 /* ── 색상 팔레트 커스텀 테마 ──────────────────────────────── */
 @theme {

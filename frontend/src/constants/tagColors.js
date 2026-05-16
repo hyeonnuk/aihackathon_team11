@@ -23,7 +23,7 @@ export const TAG_CHIP_COLORS = {
   '장학/취업': '#dfc971',
 };
 
-export const FALLBACK_TAG_COLOR      = '#ACB1BE';
+export const FALLBACK_TAG_COLOR      = '#d4d8e1';
 export const FALLBACK_TAG_TEXT_COLOR = '#383642';
 
 export function getTagColor(tags) {

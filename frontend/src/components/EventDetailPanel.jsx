@@ -54,7 +54,7 @@ function SmallReactionBtn({ emoji, count, isActive, onClick }) {
       onClick={onClick}
       className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium transition-all ${
         isActive
-          ? 'bg-indigo-50 text-indigo-600'
+          ? 'bg-primary-50 text-primary-500'
           : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
       }`}
     >
@@ -76,14 +76,14 @@ function CommentCard({ comment, onReact, isHighlighted }) {
     <div
       ref={cardRef}
       className={`py-4 transition-colors ${
-        isHighlighted ? 'rounded-xl bg-indigo-50 px-3 ring-2 ring-indigo-200' : ''
+        isHighlighted ? 'rounded-xl bg-primary-50 px-3 ring-2 ring-primary-200' : ''
       }`}
     >
       {/* 댓글 헤더 */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
-            <span className="text-[10px] font-bold text-indigo-600">
+          <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center shrink-0">
+            <span className="text-[10px] font-bold text-primary-500">
               {comment.author.charAt(0)}
             </span>
           </div>
@@ -149,7 +149,7 @@ export default function EventDetailPanel({
         <div className="flex items-center justify-between mb-3">
           <button
             onClick={onBack}
-            className="flex items-center gap-1.5 text-xs font-semibold text-indigo-500 hover:text-indigo-700 transition-colors group"
+            className="flex items-center gap-1.5 text-xs font-semibold text-primary-500 hover:text-primary-600 transition-colors group"
           >
             <svg
               className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform"
@@ -163,7 +163,7 @@ export default function EventDetailPanel({
             {onEdit && (
               <button
                 onClick={onEdit}
-                className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-gray-500 hover:text-primary-500 hover:bg-primary-50 rounded-lg transition-all"
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -274,7 +274,7 @@ export default function EventDetailPanel({
             emoji="👍"
             count={ep.likes}
             isActive={ep.userReaction === 'like'}
-            activeClass="bg-indigo-50 text-indigo-700 border-indigo-200"
+            activeClass="bg-primary-50 text-primary-600 border-primary-200"
             onClick={() => onReact('like')}
           />
           <ReactionBtn
@@ -292,7 +292,7 @@ export default function EventDetailPanel({
             href={ep.applyLink}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 w-full py-3 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 active:scale-[0.98] transition-all shadow-sm"
+            className="flex items-center justify-center gap-2 w-full py-3 bg-primary-500 text-white text-sm font-bold rounded-xl hover:bg-primary-600 active:scale-[0.98] transition-all shadow-sm"
           >
             신청하러 가기
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -313,8 +313,8 @@ export default function EventDetailPanel({
           {/* 댓글 입력 */}
           {user ? (
             <div className="flex items-center gap-2 mb-5">
-              <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
-                <span className="text-[10px] font-bold text-indigo-600">{user.name.charAt(0)}</span>
+              <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center shrink-0">
+                <span className="text-[10px] font-bold text-primary-500">{user.name.charAt(0)}</span>
               </div>
               <input
                 type="text"
@@ -322,12 +322,12 @@ export default function EventDetailPanel({
                 onChange={(e) => setCommentText(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitComment(); } }}
                 placeholder="댓글을 입력하세요..."
-                className="flex-1 px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-transparent bg-white"
+                className="flex-1 px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-transparent bg-white"
               />
               <button
                 onClick={submitComment}
                 disabled={!commentText.trim()}
-                className="px-3 py-2 text-xs font-bold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
+                className="px-3 py-2 text-xs font-bold bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
               >
                 작성
               </button>
