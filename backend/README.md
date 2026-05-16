@@ -52,6 +52,28 @@ POST /api/auth/signup
 ```
 
 `gender` accepts `male`, `female`, or `other`.
+Normal signup always creates a `user` role account.
+
+### Create Master Account
+
+```http
+POST /api/auth/master
+```
+
+This endpoint creates a `master` role account. Set `MASTER_CREATE_KEY` in `.env` first, then include the same value as `masterCreateKey`.
+
+```json
+{
+  "name": "Master User",
+  "studentNumber": "MASTER001",
+  "gender": "other",
+  "phoneNumber": "010-0000-0000",
+  "email": "master@example.com",
+  "loginId": "master",
+  "password": "password123",
+  "masterCreateKey": "change-this-master-create-key"
+}
+```
 
 ### Login
 
@@ -66,6 +88,24 @@ POST /api/auth/login
 }
 ```
 
+### Role Management
+
+Only `master` users can manage administrator roles. Send the login token in the `Authorization` header.
+
+```http
+GET /api/admin/users
+PATCH /api/admin/users/{user_id}/role
+Authorization: Bearer YOUR_MASTER_TOKEN
+```
+
+```json
+{
+  "role": "admin"
+}
+```
+
+Use `"role": "user"` to remove administrator permission.
+
 ### Schedules
 
 ```http
@@ -75,6 +115,8 @@ POST /api/schedules
 PUT /api/schedules/{schedule_id}
 DELETE /api/schedules/{schedule_id}
 ```
+
+When creating or updating a schedule with `"notice": true`, the request must include an `Authorization` bearer token for a `master` or `admin` user.
 
 Create schedule example:
 

@@ -69,7 +69,7 @@ export default function Login() {
         </div>
 
         <div className="flex gap-2">
-          {['해커톤', '스터디', '공모전', '장학'].map((tag) => (
+          {['해커톤', '강의', '공모전', '장학'].map((tag) => (
             <span key={tag} className="px-3 py-1 bg-white/10 text-white/80 text-xs font-medium rounded-full">
               #{tag}
             </span>

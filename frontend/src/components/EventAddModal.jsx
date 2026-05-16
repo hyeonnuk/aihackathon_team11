@@ -113,7 +113,9 @@ function Field({ label, required, children }) {
 
 export default function EventAddModal({ isOpen, onClose, onCreated, initialData = null, mode = 'add' }) {
   const user = getStoredUser();
-  const authorName = user?.repBadge ? `${user.repBadge} ${user.name}` : (user?.name ?? 'unknown');
+const authorName = user?.repBadge ? `${user.repBadge} ${user.name}` : (user?.name ?? 'unknown');
+const canManageNotice = user?.role === 'master' || user?.role === 'admin';
+
   const [form, setForm] = useState(() =>
     mode === 'edit' && initialData ? initialData : initForm(authorName),
   );
@@ -171,7 +173,7 @@ export default function EventAddModal({ isOpen, onClose, onCreated, initialData 
       link: normalizeLink(form.link),
       note: form.note.trim() || null,
       grade: form.grade,
-      notice: form.notice,
+      notice: canManageNotice ? form.notice : false,
       hashtag: toHashtagText(form.hashtags),
       author: form.author,
     };
@@ -182,6 +184,11 @@ export default function EventAddModal({ isOpen, onClose, onCreated, initialData 
     const url = isEdit
       ? `${API_BASE_URL}/api/schedules/${initialData.scheduleId}`
       : `${API_BASE_URL}/api/schedules`;
+    const token = localStorage.getItem('token');
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
 
     try {
       // -- LOCAL STORAGE FALLBACK LOGIC (백엔드 에러 대비 로컬 백업) --
@@ -215,7 +222,7 @@ export default function EventAddModal({ isOpen, onClose, onCreated, initialData 
 
       const response = await fetch(url, {
         method: isEdit ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(payload),
       });
 
@@ -266,25 +273,27 @@ export default function EventAddModal({ isOpen, onClose, onCreated, initialData 
 
         <div className="flex-1 overflow-y-auto">
           <form id="event-add-form" onSubmit={handleSubmit} className="flex flex-col gap-5 px-6 py-5">
-            <Field label="공지 여부">
-              <label className="flex h-[46px] cursor-pointer select-none items-center gap-3">
-                <div className="relative shrink-0">
-                  <input
-                    type="checkbox"
-                    checked={form.notice}
-                    className="peer sr-only"
-                    onChange={(event) =>
-                      setForm((prev) => ({ ...prev, notice: event.target.checked }))
-                    }
-                  />
-                  <div className="h-6 w-10 rounded-full bg-gray-200 transition-colors duration-200 peer-checked:bg-primary-500" />
-                  <div className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-4" />
-                </div>
-                {form.notice && (
-                  <span className="text-sm text-gray-600">공지로 등록됩니다</span>
-                )}
-              </label>
-            </Field>
+            {canManageNotice && (
+              <Field label="공지 여부">
+                <label className="flex h-[46px] cursor-pointer select-none items-center gap-3">
+                  <div className="relative shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={form.notice}
+                      className="peer sr-only"
+                      onChange={(event) =>
+                        setForm((prev) => ({ ...prev, notice: event.target.checked }))
+                      }
+                    />
+                    <div className="h-6 w-10 rounded-full bg-gray-200 transition-colors duration-200 peer-checked:bg-primary-500" />
+                    <div className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-4" />
+                  </div>
+                  {form.notice && (
+                    <span className="text-sm text-gray-600">공지로 등록됩니다</span>
+                  )}
+                </label>
+              </Field>
+            )}
 
             <Field label="제목" required>
               <input
@@ -367,7 +376,7 @@ export default function EventAddModal({ isOpen, onClose, onCreated, initialData 
 
             <Field label="해시태그">
               <div className="flex flex-wrap gap-2">
-                {['공모전', '해커톤', '스터디', '프로젝트', '장학/취업'].map((tag) => {
+                {['공모전', '해커톤', '강의', '프로젝트', '장학/취업'].map((tag) => {
                   const isSelected = form.hashtags.includes(tag);
                   return (
                     <button

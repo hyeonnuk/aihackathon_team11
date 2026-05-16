@@ -6,7 +6,7 @@ import bcrypt
 import jwt
 import mysql.connector
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, Header, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from mysql.connector import pooling
 from mysql.connector.errors import IntegrityError
@@ -21,6 +21,7 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_NAME = os.getenv("DB_NAME", "synccs")
 JWT_SECRET = os.getenv("JWT_SECRET", "change-this-secret")
 JWT_EXPIRES_MINUTES = int(os.getenv("JWT_EXPIRES_MINUTES", "120"))
+MASTER_CREATE_KEY = os.getenv("MASTER_CREATE_KEY", "")
 CLIENT_ORIGINS = [
     origin.strip()
     for origin in os.getenv("CLIENT_ORIGINS", "http://localhost:5173").split(",")
@@ -82,6 +83,38 @@ class SignupRequest(BaseModel):
         if normalized not in gender_map:
             raise ValueError("must be male, female, or other")
         return gender_map[normalized]
+
+
+class MasterSignupRequest(SignupRequest):
+    masterCreateKey: str = Field(min_length=1)
+
+    @field_validator("masterCreateKey")
+    @classmethod
+    def strip_master_create_key(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("must not be blank")
+        return value
+
+
+class UserRoleUpdateRequest(BaseModel):
+    role: str = Field(min_length=1)
+
+    @field_validator("role")
+    @classmethod
+    def normalize_role(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        role_map = {
+            "admin": "admin",
+            "administrator": "admin",
+            "\uad00\ub9ac\uc790": "admin",
+            "user": "user",
+            "normal": "user",
+            "\uc77c\ubc18": "user",
+        }
+        if normalized not in role_map:
+            raise ValueError("role must be admin or user")
+        return role_map[normalized]
 
 
 class LoginRequest(BaseModel):
@@ -293,6 +326,7 @@ def init_tables() -> None:
               login_id VARCHAR(50) NOT NULL,
               password_hash VARCHAR(255) NOT NULL,
               profile_image LONGTEXT NULL,
+              role ENUM('master', 'admin', 'user') NOT NULL DEFAULT 'user',
               created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
               updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
               PRIMARY KEY (id),
@@ -305,9 +339,11 @@ def init_tables() -> None:
         cursor.execute("SHOW COLUMNS FROM users LIKE 'profile_image'")
         if cursor.fetchone() is None:
             cursor.execute("ALTER TABLE users ADD COLUMN profile_image LONGTEXT NULL AFTER password_hash")
-        cursor.execute("SHOW COLUMNS FROM users LIKE 'rep_badge'")
+        cursor.execute("SHOW COLUMNS FROM users LIKE 'role'")
         if cursor.fetchone() is None:
-            cursor.execute("ALTER TABLE users ADD COLUMN rep_badge VARCHAR(100) NULL AFTER profile_image")
+            cursor.execute(
+                "ALTER TABLE users ADD COLUMN role ENUM('master', 'admin', 'user') NOT NULL DEFAULT 'user' AFTER profile_image"
+            )
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS schedules (
@@ -390,10 +426,10 @@ def verify_password(password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8"))
 
 
-def create_access_token(user_id: int, login_id: str) -> str:
+def create_access_token(user_id: int, login_id: str, role: str) -> str:
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=JWT_EXPIRES_MINUTES)
     return jwt.encode(
-        {"userId": user_id, "loginId": login_id, "exp": expires_at},
+        {"userId": user_id, "loginId": login_id, "role": role, "exp": expires_at},
         JWT_SECRET,
         algorithm="HS256",
     )
@@ -409,8 +445,108 @@ def to_user_response(row: dict) -> dict:
         "email": row["email"],
         "loginId": row["login_id"],
         "profileImage": row.get("profile_image"),
-        "repBadge": row.get("rep_badge"),
+        "role": row.get("role", "user"),
     }
+
+
+def to_admin_user_response(row: dict) -> dict:
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "studentNumber": row["student_number"],
+        "gender": row["gender"],
+        "phoneNumber": row["phone_number"],
+        "email": row["email"],
+        "loginId": row["login_id"],
+        "role": row.get("role", "user"),
+        "createdAt": serialize_datetime(row["created_at"]),
+    }
+
+
+def load_user_from_authorization(authorization: str | None, required: bool = True) -> dict | None:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        if not required:
+            return None
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization bearer token is required.",
+        )
+
+    token = authorization.split(" ", 1)[1].strip()
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired.",
+        )
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token.",
+        )
+
+    user_id = payload.get("userId")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload.",
+        )
+
+    try:
+        connection = get_connection()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            cursor.execute(
+                """
+                SELECT id, name, student_number, gender, phone_number, email,
+                       login_id, profile_image, role, created_at
+                FROM users
+                WHERE id = %s
+                LIMIT 1
+                """,
+                (user_id,),
+            )
+            user = cursor.fetchone()
+        finally:
+            cursor.close()
+            connection.close()
+    except mysql.connector.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to load current user.",
+        )
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found.",
+        )
+    return user
+
+
+def get_current_user(authorization: str | None = Header(default=None)) -> dict:
+    return load_user_from_authorization(authorization, required=True)
+
+
+def require_master_user(current_user: dict = Depends(get_current_user)) -> dict:
+    if current_user.get("role") != "master":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Master role is required.",
+        )
+    return current_user
+
+
+def ensure_notice_permission(notice: bool, authorization: str | None) -> None:
+    if not notice:
+        return
+    current_user = load_user_from_authorization(authorization, required=True)
+    if current_user["role"] not in ("master", "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only master or admin can create or update notices.",
+        )
 
 
 def serialize_datetime(value):
@@ -517,7 +653,7 @@ def load_user_activity(cursor, user_id: int) -> tuple[dict, list[dict], list[dic
     cursor.execute(
         """
         SELECT id, name, student_number, gender, phone_number, email,
-               login_id, profile_image, rep_badge
+               login_id, profile_image, role
         FROM users
         WHERE id = %s
         LIMIT 1
@@ -599,6 +735,7 @@ def health_check():
 @app.post("/api/auth/signup", status_code=status.HTTP_201_CREATED)
 def signup(payload: SignupRequest):
     password_hash = hash_password(payload.password)
+    role = "user"
 
     try:
         connection = get_connection()
@@ -607,8 +744,8 @@ def signup(payload: SignupRequest):
             cursor.execute(
                 """
                 INSERT INTO users
-                  (name, student_number, gender, phone_number, email, login_id, password_hash)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                  (name, student_number, gender, phone_number, email, login_id, password_hash, role)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     payload.name,
@@ -618,6 +755,7 @@ def signup(payload: SignupRequest):
                     payload.email.lower(),
                     payload.loginId,
                     password_hash,
+                    role,
                 ),
             )
             connection.commit()
@@ -646,6 +784,75 @@ def signup(payload: SignupRequest):
             "phoneNumber": payload.phoneNumber,
             "email": payload.email.lower(),
             "loginId": payload.loginId,
+            "role": role,
+        },
+    }
+
+
+@app.post("/api/auth/master", status_code=status.HTTP_201_CREATED)
+def create_master_user(payload: MasterSignupRequest):
+    if not MASTER_CREATE_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="MASTER_CREATE_KEY is not configured.",
+        )
+    if payload.masterCreateKey != MASTER_CREATE_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid master create key.",
+        )
+
+    password_hash = hash_password(payload.password)
+    role = "master"
+
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
+        try:
+            cursor.execute(
+                """
+                INSERT INTO users
+                  (name, student_number, gender, phone_number, email, login_id, password_hash, role)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    payload.name,
+                    payload.studentNumber,
+                    payload.gender,
+                    payload.phoneNumber,
+                    payload.email.lower(),
+                    payload.loginId,
+                    password_hash,
+                    role,
+                ),
+            )
+            connection.commit()
+            user_id = cursor.lastrowid
+        finally:
+            cursor.close()
+            connection.close()
+    except IntegrityError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Student number, email, or login id already exists.",
+        )
+    except mysql.connector.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Master signup failed.",
+        )
+
+    return {
+        "message": "Master account created.",
+        "user": {
+            "id": user_id,
+            "name": payload.name,
+            "studentNumber": payload.studentNumber,
+            "gender": payload.gender,
+            "phoneNumber": payload.phoneNumber,
+            "email": payload.email.lower(),
+            "loginId": payload.loginId,
+            "role": role,
         },
     }
 
@@ -659,7 +866,7 @@ def login(payload: LoginRequest):
             cursor.execute(
                 """
                 SELECT id, name, student_number, gender, phone_number, email, login_id,
-                       password_hash, profile_image, rep_badge
+                       password_hash, profile_image, role
                 FROM users
                 WHERE login_id = %s
                 LIMIT 1
@@ -684,7 +891,7 @@ def login(payload: LoginRequest):
 
     return {
         "message": "Login completed.",
-        "token": create_access_token(user["id"], user["login_id"]),
+        "token": create_access_token(user["id"], user["login_id"], user["role"]),
         "user": to_user_response(user),
     }
 
@@ -697,7 +904,7 @@ def list_signup_users():
         try:
             cursor.execute(
                 """
-                SELECT id, login_id, name, student_number, email, created_at
+                SELECT id, login_id, name, student_number, email, role, created_at
                 FROM users
                 ORDER BY id DESC
                 """
@@ -721,10 +928,114 @@ def list_signup_users():
                 "name": user["name"],
                 "studentNumber": user["student_number"],
                 "email": user["email"],
+                "role": user["role"],
                 "createdAt": user["created_at"].isoformat() if user["created_at"] else None,
             }
             for user in users
         ],
+    }
+
+
+@app.get("/api/admin/users")
+def list_users_for_role_management(current_user: dict = Depends(require_master_user)):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            cursor.execute(
+                """
+                SELECT id, name, student_number, gender, phone_number, email,
+                       login_id, role, created_at
+                FROM users
+                ORDER BY
+                  CASE role
+                    WHEN 'master' THEN 0
+                    WHEN 'admin' THEN 1
+                    ELSE 2
+                  END,
+                  id DESC
+                """
+            )
+            users = cursor.fetchall()
+        finally:
+            cursor.close()
+            connection.close()
+    except mysql.connector.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to load users.",
+        )
+
+    return {
+        "count": len(users),
+        "users": [to_admin_user_response(user) for user in users],
+        "currentUser": to_admin_user_response(current_user),
+    }
+
+
+@app.patch("/api/admin/users/{user_id}/role")
+def update_user_role(
+    user_id: int,
+    payload: UserRoleUpdateRequest,
+    current_user: dict = Depends(require_master_user),
+):
+    if user_id == current_user["id"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Master cannot change their own role here.",
+        )
+
+    try:
+        connection = get_connection()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            cursor.execute(
+                "SELECT id, role FROM users WHERE id = %s LIMIT 1",
+                (user_id,),
+            )
+            target_user = cursor.fetchone()
+            if not target_user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="User not found.",
+                )
+            if target_user["role"] == "master":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Master role cannot be changed here.",
+                )
+
+            cursor.execute(
+                "UPDATE users SET role = %s WHERE id = %s",
+                (payload.role, user_id),
+            )
+            connection.commit()
+
+            cursor.execute(
+                """
+                SELECT id, name, student_number, gender, phone_number, email,
+                       login_id, role, created_at
+                FROM users
+                WHERE id = %s
+                LIMIT 1
+                """,
+                (user_id,),
+            )
+            updated_user = cursor.fetchone()
+        finally:
+            cursor.close()
+            connection.close()
+    except HTTPException:
+        raise
+    except mysql.connector.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update user role.",
+        )
+
+    return {
+        "message": "User role updated.",
+        "user": to_admin_user_response(updated_user),
     }
 
 
@@ -1058,10 +1369,16 @@ def create_schedule_comment(schedule_id: int, payload: CommentCreateRequest):
             comment_id = cursor.lastrowid
 
             cursor.execute(
-                "SELECT id, schedule_id, parent_id, author, content, like_count, dislike_count, created_at FROM schedule_comments WHERE id = %s",
-                (comment_id,)
+                """
+                SELECT id, schedule_id, parent_id, author, content,
+                       like_count, dislike_count, created_at
+                FROM schedule_comments
+                WHERE id = %s
+                LIMIT 1
+                """,
+                (comment_id,),
             )
-            new_comment = cursor.fetchone()
+            comment = cursor.fetchone()
         finally:
             cursor.close()
             connection.close()
@@ -1074,6 +1391,216 @@ def create_schedule_comment(schedule_id: int, payload: CommentCreateRequest):
         )
 
     return {
-        "message": "Comment created.",
-        "comment": to_comment_response(new_comment)
+        "message": "Schedule comment created.",
+        "comment": to_comment_response(comment),
+    }
+
+
+@app.patch("/api/schedules/{schedule_id}/comments/{comment_id}/reactions")
+def update_schedule_comment_reactions(
+    schedule_id: int,
+    comment_id: int,
+    payload: ScheduleReactionRequest,
+):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            cursor.execute(
+                """
+                UPDATE schedule_comments
+                SET
+                  like_count = GREATEST(CAST(like_count AS SIGNED) + %s, 0),
+                  dislike_count = GREATEST(CAST(dislike_count AS SIGNED) + %s, 0)
+                WHERE id = %s AND schedule_id = %s
+                """,
+                (payload.likeDelta, payload.dislikeDelta, comment_id, schedule_id),
+            )
+            if cursor.rowcount == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Schedule comment not found.",
+                )
+            connection.commit()
+
+            cursor.execute(
+                """
+                SELECT like_count, dislike_count
+                FROM schedule_comments
+                WHERE id = %s AND schedule_id = %s
+                LIMIT 1
+                """,
+                (comment_id, schedule_id),
+            )
+            counts = cursor.fetchone()
+        finally:
+            cursor.close()
+            connection.close()
+    except HTTPException:
+        raise
+    except mysql.connector.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update schedule comment reactions.",
+        )
+
+    return {
+        "message": "Schedule comment reactions updated.",
+        "id": comment_id,
+        "scheduleId": schedule_id,
+        "likes": counts["like_count"],
+        "dislikes": counts["dislike_count"],
+    }
+
+
+@app.post("/api/schedules", status_code=status.HTTP_201_CREATED)
+def create_schedule(payload: ScheduleCreateRequest, authorization: str | None = Header(default=None)):
+    ensure_notice_permission(payload.notice, authorization)
+
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
+        try:
+            cursor.execute(
+                """
+                INSERT INTO schedules
+                  (title, start_date, end_date, content, photo, link, note,
+                   grade, notice, hashtag, author)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    payload.title,
+                    payload.startDate,
+                    payload.endDate,
+                    payload.content,
+                    payload.photo,
+                    payload.link,
+                    payload.note,
+                    payload.grade,
+                    payload.notice,
+                    payload.hashtag,
+                    payload.author,
+                ),
+            )
+            connection.commit()
+            schedule_id = cursor.lastrowid
+        finally:
+            cursor.close()
+            connection.close()
+    except mysql.connector.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create schedule.",
+        )
+
+    return {
+        "message": "Schedule created.",
+        "id": schedule_id,
+    }
+
+
+@app.put("/api/schedules/{schedule_id}")
+def update_schedule(
+    schedule_id: int,
+    payload: ScheduleUpdateRequest,
+    authorization: str | None = Header(default=None),
+):
+    updates = payload.model_dump(exclude_unset=True)
+    if not updates:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No fields to update.",
+        )
+    if updates.get("notice") is True:
+        ensure_notice_permission(True, authorization)
+
+    column_map = {
+        "title": "title",
+        "startDate": "start_date",
+        "endDate": "end_date",
+        "content": "content",
+        "photo": "photo",
+        "link": "link",
+        "note": "note",
+        "grade": "grade",
+        "notice": "notice",
+        "hashtag": "hashtag",
+        "author": "author",
+    }
+
+    try:
+        connection = get_connection()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            cursor.execute(
+                "SELECT start_date, end_date FROM schedules WHERE id = %s LIMIT 1",
+                (schedule_id,),
+            )
+            current_schedule = cursor.fetchone()
+            if not current_schedule:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Schedule not found.",
+                )
+
+            next_start = updates.get("startDate", current_schedule["start_date"])
+            next_end = updates.get("endDate", current_schedule["end_date"])
+            if next_end < next_start:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="endDate must be greater than or equal to startDate.",
+                )
+
+            set_clause = ", ".join(f"{column_map[field]} = %s" for field in updates)
+            values = [updates[field] for field in updates]
+            values.append(schedule_id)
+            cursor.execute(
+                f"UPDATE schedules SET {set_clause} WHERE id = %s",
+                values,
+            )
+            connection.commit()
+        finally:
+            cursor.close()
+            connection.close()
+    except HTTPException:
+        raise
+    except mysql.connector.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update schedule.",
+        )
+
+    return {
+        "message": "Schedule updated.",
+        "id": schedule_id,
+    }
+
+
+@app.delete("/api/schedules/{schedule_id}")
+def delete_schedule(schedule_id: int):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
+        try:
+            cursor.execute("DELETE FROM schedules WHERE id = %s", (schedule_id,))
+            connection.commit()
+            deleted_count = cursor.rowcount
+        finally:
+            cursor.close()
+            connection.close()
+    except mysql.connector.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete schedule.",
+        )
+
+    if deleted_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Schedule not found.",
+        )
+
+    return {
+        "message": "Schedule deleted.",
+        "id": schedule_id,
     }
