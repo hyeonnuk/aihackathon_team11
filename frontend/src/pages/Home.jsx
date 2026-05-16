@@ -1100,6 +1100,8 @@ export default function Home() {
   const handleAddComment = async (eventId, content) => {
     const currentEvent = events.find((event) => event.id === eventId);
     if (!currentEvent) return;
+    
+    const authorName = user?.repBadge ? `${user.repBadge} ${user.name}` : (user?.name ?? 'unknown');
 
     try {
       const response = await fetch(
@@ -1108,7 +1110,7 @@ export default function Home() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            author: user?.name ?? 'unknown',
+            author: authorName,
             content,
           }),
         },
@@ -1163,7 +1165,7 @@ export default function Home() {
                     <span className="text-xs font-bold text-primary-600">{user.name?.charAt(0)}</span>
                   )}
                 </div>
-                <span className="text-sm font-medium text-primary-700">{user.name}님</span>
+                <span className="text-sm font-medium text-primary-700">{user.repBadge ? `${user.repBadge} ` : ''}{user.name}님</span>
               </button>
               <button
                 onClick={handleLogout}

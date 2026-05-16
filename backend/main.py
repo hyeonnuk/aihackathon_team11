@@ -97,6 +97,10 @@ class LoginRequest(BaseModel):
         return value
 
 
+class RepBadgeUpdateRequest(BaseModel):
+    repBadge: str | None = None
+
+
 class ProfileImageUpdateRequest(BaseModel):
     profileImage: str = Field(min_length=1)
 
@@ -301,6 +305,9 @@ def init_tables() -> None:
         cursor.execute("SHOW COLUMNS FROM users LIKE 'profile_image'")
         if cursor.fetchone() is None:
             cursor.execute("ALTER TABLE users ADD COLUMN profile_image LONGTEXT NULL AFTER password_hash")
+        cursor.execute("SHOW COLUMNS FROM users LIKE 'rep_badge'")
+        if cursor.fetchone() is None:
+            cursor.execute("ALTER TABLE users ADD COLUMN rep_badge VARCHAR(100) NULL AFTER profile_image")
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS schedules (
@@ -402,6 +409,7 @@ def to_user_response(row: dict) -> dict:
         "email": row["email"],
         "loginId": row["login_id"],
         "profileImage": row.get("profile_image"),
+        "repBadge": row.get("rep_badge"),
     }
 
 
@@ -509,7 +517,7 @@ def load_user_activity(cursor, user_id: int) -> tuple[dict, list[dict], list[dic
     cursor.execute(
         """
         SELECT id, name, student_number, gender, phone_number, email,
-               login_id, profile_image
+               login_id, profile_image, rep_badge
         FROM users
         WHERE id = %s
         LIMIT 1
@@ -651,7 +659,7 @@ def login(payload: LoginRequest):
             cursor.execute(
                 """
                 SELECT id, name, student_number, gender, phone_number, email, login_id,
-                       password_hash, profile_image
+                       password_hash, profile_image, rep_badge
                 FROM users
                 WHERE login_id = %s
                 LIMIT 1
@@ -861,6 +869,39 @@ def update_profile_image(user_id: int, payload: ProfileImageUpdateRequest):
     return {
         "message": "Profile image updated.",
         "profileImage": payload.profileImage,
+    }
+
+
+@app.put("/api/users/{user_id}/rep-badge")
+def update_rep_badge(user_id: int, payload: RepBadgeUpdateRequest):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
+        try:
+            cursor.execute(
+                "UPDATE users SET rep_badge = %s WHERE id = %s",
+                (payload.repBadge, user_id),
+            )
+            connection.commit()
+            updated_count = cursor.rowcount
+        finally:
+            cursor.close()
+            connection.close()
+    except mysql.connector.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update rep badge.",
+        )
+
+    if updated_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found.",
+        )
+
+    return {
+        "message": "Representative badge updated.",
+        "repBadge": payload.repBadge,
     }
 
 
