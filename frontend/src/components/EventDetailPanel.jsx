@@ -340,32 +340,14 @@ export default function EventDetailPanel({
 }) {
   const [commentText, setCommentText] = useState('');
   const ep = event.extendedProps;
-  const [prevEventId, setPrevEventId] = useState(event.id);
-
-  const [localComments, setLocalComments] = useState(() => {
-    try {
-      const stored = localStorage.getItem(`comments_${event.id}`);
-      return stored ? JSON.parse(stored) : (ep.comments || []);
-    } catch {
-      return ep.comments || [];
-    }
-  });
-
-  // 이벤트가 변경되었을 때 다른 일정의 댓글로 덮어씌워지는 것을 방지 (즉시 동기화)
-  if (event.id !== prevEventId) {
-    setPrevEventId(event.id);
-    setCommentText(''); // 입력 중이던 댓글 초기화
-    try {
-      const stored = localStorage.getItem(`comments_${event.id}`);
-      setLocalComments(stored ? JSON.parse(stored) : (ep.comments || []));
-    } catch {
-      setLocalComments(ep.comments || []);
-    }
-  }
+  const [localComments, setLocalComments] = useState(ep.comments || []);
+  useEffect(() => {
+    setLocalComments(ep.comments || []);
+  }, [ep.comments]);
 
   useEffect(() => {
-    localStorage.setItem(`comments_${event.id}`, JSON.stringify(localComments));
-  }, [localComments, event.id]);
+    setCommentText('');
+  }, [event.id]);
 
   // 하위 컴포넌트 이벤트 래핑(Intercept) : 부모의 로컬 상태(저장소)를 업데이트하기 위함
   const handleInterceptEditComment = (id, content) => {
@@ -458,6 +440,7 @@ export default function EventDetailPanel({
     const text = commentText.trim();
     if (!text) return;
 
+    /*
     const newComment = {
       id: `comment_${Date.now()}`,
       content: text,
@@ -469,6 +452,7 @@ export default function EventDetailPanel({
       replies: [],
     };
     setLocalComments((prev) => [...prev, newComment]);
+    */
 
     if (onAddComment) onAddComment(text);
     setCommentText('');
@@ -619,25 +603,27 @@ export default function EventDetailPanel({
         </div>
 
         {/* 좋아요 / 싫어요 */}
-        <div className="flex items-center gap-3">
-          <ReactionBtn
-            emoji="👍"
-            count={ep.likes}
-            isActive={ep.userReaction === 'like'}
-            activeClass="bg-primary-50 text-primary-600 border-primary-200"
-            onClick={() => onReact('like')}
-          />
-          <ReactionBtn
-            emoji="👎"
-            count={ep.dislikes}
-            isActive={ep.userReaction === 'dislike'}
-            activeClass="bg-rose-50 text-rose-600 border-rose-200"
-            onClick={() => onReact('dislike')}
-          />
-        </div>
+        {!ep.isMemo && (
+          <div className="flex items-center gap-3">
+            <ReactionBtn
+              emoji="👍"
+              count={ep.likes}
+              isActive={ep.userReaction === 'like'}
+              activeClass="bg-primary-50 text-primary-600 border-primary-200"
+              onClick={() => onReact('like')}
+            />
+            <ReactionBtn
+              emoji="👎"
+              count={ep.dislikes}
+              isActive={ep.userReaction === 'dislike'}
+              activeClass="bg-rose-50 text-rose-600 border-rose-200"
+              onClick={() => onReact('dislike')}
+            />
+          </div>
+        )}
 
         {/* 신청 링크 버튼 */}
-        {ep.applyLink && (
+        {ep.applyLink && !ep.isMemo && (
           <a
             href={ep.applyLink}
             target="_blank"
@@ -655,67 +641,69 @@ export default function EventDetailPanel({
         <div className="h-px bg-gray-100" />
 
         {/* 댓글 영역 */}
-        <div>
-          <p className="text-xs font-bold text-gray-700 mb-4">
-            💬 댓글 {localComments.length}개
-          </p>
+        {!ep.isMemo && (
+          <div>
+            <p className="text-xs font-bold text-gray-700 mb-4">
+              💬 댓글 {localComments.length}개
+            </p>
 
-          {/* 댓글 입력 */}
-          {user ? (
-            <div className="flex items-center gap-2 mb-5">
-              <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center shrink-0">
-                <span className="text-[10px] font-bold text-primary-500">{user.name.charAt(0)}</span>
-              </div>
-              <input
-                type="text"
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.nativeEvent?.isComposing) {
-                    e.preventDefault();
-                    submitComment();
-                  }
-                }}
-                placeholder="댓글을 입력하세요..."
-                className="flex-1 px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-transparent bg-white"
-              />
-              <button
-                onClick={submitComment}
-                disabled={!commentText.trim()}
-                className="px-3 py-2 text-xs font-bold bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
-              >
-                등록
-              </button>
-            </div>
-          ) : (
-            <div className="text-xs text-center text-gray-400 mb-5 py-2 bg-gray-50 rounded-lg">
-              댓글을 작성하려면 로그인이 필요합니다.
-            </div>
-          )}
-
-          {/* 댓글 목록 */}
-          {localComments.length === 0 ? (
-            <p className="text-xs text-gray-400 text-center py-6">아직 댓글이 없습니다.</p>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {localComments.map((comment) => (
-                <CommentCard
-                  key={comment.id}
-                  comment={comment}
-                  user={user}
-                  onReact={handleInterceptCommentReact}
-                  onEditComment={handleInterceptEditComment}
-                  onDeleteComment={handleInterceptDeleteComment}
-                  onAddReply={handleInterceptAddReply}
-                  onEditReply={handleInterceptEditReply}
-                  onDeleteReply={handleInterceptDeleteReply}
-                  onReplyReact={handleInterceptReplyReact}
-                  isHighlighted={String(comment.id) === String(highlightedCommentId)}
+            {/* 댓글 입력 */}
+            {user ? (
+              <div className="flex items-center gap-2 mb-5">
+                <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center shrink-0">
+                  <span className="text-[10px] font-bold text-primary-500">{user.name.charAt(0)}</span>
+                </div>
+                <input
+                  type="text"
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.nativeEvent?.isComposing) {
+                      e.preventDefault();
+                      submitComment();
+                    }
+                  }}
+                  placeholder="댓글을 입력하세요..."
+                  className="flex-1 px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-transparent bg-white"
                 />
-              ))}
-            </div>
-          )}
-        </div>
+                <button
+                  onClick={submitComment}
+                  disabled={!commentText.trim()}
+                  className="px-3 py-2 text-xs font-bold bg-primary-500 text-white rounded-lg hover:bg-primary-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
+                >
+                  등록
+                </button>
+              </div>
+            ) : (
+              <div className="text-xs text-center text-gray-400 mb-5 py-2 bg-gray-50 rounded-lg">
+                댓글을 작성하려면 로그인이 필요합니다.
+              </div>
+            )}
+
+            {/* 댓글 목록 */}
+            {localComments.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-6">아직 댓글이 없습니다.</p>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {localComments.map((comment) => (
+                  <CommentCard
+                    key={comment.id}
+                    comment={comment}
+                    user={user}
+                    onReact={handleInterceptCommentReact}
+                    onEditComment={handleInterceptEditComment}
+                    onDeleteComment={handleInterceptDeleteComment}
+                    onAddReply={handleInterceptAddReply}
+                    onEditReply={handleInterceptEditReply}
+                    onDeleteReply={handleInterceptDeleteReply}
+                    onReplyReact={handleInterceptReplyReact}
+                    isHighlighted={String(comment.id) === String(highlightedCommentId)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
