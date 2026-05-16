@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../App.css';
 import EventAddModal from '../components/EventAddModal';
+import EventDetailPanel from '../components/EventDetailPanel';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
@@ -13,7 +14,7 @@ const ALL_GRADES = ['1학년', '2학년', '3학년', '4학년'];
 const ALL_TAGS = ['공모전', '해커톤', '스터디', '프로젝트', '장학/취업'];
 const EVENT_COLORS = ['#818cf8', '#fb7185', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa', '#f472b6'];
 
-const DETAIL_EVENTS = [
+const EVENTS_DATA = [
   {
     id: 'detail-1',
     title: '교내 웹 해커톤',
@@ -24,7 +25,26 @@ const DETAIL_EVENTS = [
     extendedProps: {
       grade: ['2학년', '3학년', '4학년'],
       tags: ['해커톤', '프로젝트'],
-      description: '학교 주관 웹 개발 해커톤. 팀원 모집 후 참가 등록 필요.',
+      description:
+        '교내 학생들이 팀을 이루어 웹 서비스를 개발하는 해커톤입니다.\n최대 5명 팀으로 구성하여 24시간 동안 개발 및 발표를 진행합니다.',
+      applyPeriod: '2026-05-01 ~ 2026-05-18',
+      applyEndDate: '2026-05-18',
+      author: '관리자',
+      applyLink: 'https://example.com/hackathon',
+      likes: 12,
+      dislikes: 2,
+      userReaction: null,
+      comments: [
+        {
+          id: 1,
+          author: '김학생',
+          content: '백엔드 가능한 팀원 구합니다.',
+          createdAt: '2026-05-16 14:30',
+          likes: 3,
+          dislikes: 0,
+          userReaction: null,
+        },
+      ],
     },
   },
   {
@@ -37,7 +57,15 @@ const DETAIL_EVENTS = [
     extendedProps: {
       grade: ['1학년', '2학년', '3학년', '4학년'],
       tags: ['프로젝트'],
-      description: '소프트웨어공학 기말 프로젝트 발표. PPT 및 데모 준비 필요.',
+      description: '소프트웨어공학 기말 프로젝트 발표 일정입니다. PPT 및 데모 준비가 필요합니다.',
+      applyPeriod: '2026-05-05 ~ 2026-05-24',
+      applyEndDate: '2026-05-24',
+      author: '김교수',
+      applyLink: null,
+      likes: 8,
+      dislikes: 1,
+      userReaction: null,
+      comments: [],
     },
   },
   {
@@ -49,7 +77,15 @@ const DETAIL_EVENTS = [
     extendedProps: {
       grade: ['3학년', '4학년'],
       tags: ['장학/취업'],
-      description: '카카오 2026 하반기 공채 코딩테스트. 온라인 진행.',
+      description: '카카오 2026 하반기 공채 코딩테스트입니다. 온라인으로 진행됩니다.',
+      applyPeriod: '2026-04-20 ~ 2026-05-13',
+      applyEndDate: '2026-05-13',
+      author: '취업지원팀',
+      applyLink: 'https://careers.kakao.com',
+      likes: 20,
+      dislikes: 0,
+      userReaction: null,
+      comments: [],
     },
   },
   {
@@ -61,7 +97,15 @@ const DETAIL_EVENTS = [
     extendedProps: {
       grade: ['1학년', '2학년', '3학년', '4학년'],
       tags: ['스터디'],
-      description: '매주 화요일 알고리즘 스터디. 이번 주 주제: 다이나믹 프로그래밍.',
+      description: '매주 화요일 알고리즘 스터디. 이번 주 주제는 다이나믹 프로그래밍입니다.',
+      applyPeriod: null,
+      applyEndDate: null,
+      author: '최민준',
+      applyLink: null,
+      likes: 7,
+      dislikes: 0,
+      userReaction: null,
+      comments: [],
     },
   },
   {
@@ -74,7 +118,15 @@ const DETAIL_EVENTS = [
     extendedProps: {
       grade: ['2학년', '3학년', '4학년'],
       tags: ['공모전', '프로젝트'],
-      description: 'Google 머신러닝 부트캠프. 사전 과제 제출 후 참가 가능.',
+      description: 'Google 머신러닝 부트캠프입니다. 사전 과제 제출 후 참가 가능합니다.',
+      applyPeriod: '2026-05-01 ~ 2026-05-31',
+      applyEndDate: '2026-05-31',
+      author: '운영진',
+      applyLink: 'https://developers.google.com/ml-bootcamp',
+      likes: 35,
+      dislikes: 3,
+      userReaction: null,
+      comments: [],
     },
   },
 ];
@@ -90,14 +142,22 @@ function getTodayStr() {
 
 function formatDateLabel(dateStr) {
   const [year, month, day] = dateStr.split('-').map(Number);
-  const d = new Date(year, month - 1, day);
-  return `${month}월 ${day}일 (${DAY_NAMES[d.getDay()]})`;
+  const date = new Date(year, month - 1, day);
+  return `${month}월 ${day}일 (${DAY_NAMES[date.getDay()]})`;
+}
+
+function formatNow() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
+    now.getDate(),
+  ).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(
+    now.getMinutes(),
+  ).padStart(2, '0')}`;
 }
 
 function getStoredUser() {
   try {
-    const raw = localStorage.getItem('user');
-    return raw ? JSON.parse(raw) : null;
+    return JSON.parse(localStorage.getItem('user') ?? 'null');
   } catch {
     return null;
   }
@@ -105,6 +165,10 @@ function getStoredUser() {
 
 function normalizeDateTime(value) {
   return value ? value.replace(' ', 'T') : value;
+}
+
+function getDatePart(value) {
+  return normalizeDateTime(value)?.slice(0, 10);
 }
 
 function addOneDay(dateStr) {
@@ -115,10 +179,6 @@ function addOneDay(dateStr) {
     String(date.getMonth() + 1).padStart(2, '0'),
     String(date.getDate()).padStart(2, '0'),
   ].join('-');
-}
-
-function getDatePart(value) {
-  return normalizeDateTime(value)?.slice(0, 10);
 }
 
 function parseTags(hashtag) {
@@ -134,19 +194,20 @@ function gradeToLabels(grade) {
   return [`${grade}학년`];
 }
 
-function scheduleToEvent(schedule, index) {
+function scheduleToCalendarEvent(schedule, index) {
   const color = schedule.notice ? '#ef4444' : EVENT_COLORS[index % EVENT_COLORS.length];
+  const start = getDatePart(schedule.startDate);
+  const end = getDatePart(schedule.endDate || schedule.startDate);
 
   return {
-    id: String(schedule.id),
+    id: `schedule-${schedule.id}`,
     title: schedule.notice ? `[공지] ${schedule.title}` : schedule.title,
-    start: getDatePart(schedule.startDate),
-    end: addOneDay(getDatePart(schedule.endDate || schedule.startDate)),
+    start,
+    end: addOneDay(end || start),
     allDay: true,
     backgroundColor: color,
     borderColor: color,
     extendedProps: {
-      schedule,
       grade: gradeToLabels(schedule.grade),
       tags: parseTags(schedule.hashtag),
       description: schedule.content,
@@ -156,7 +217,6 @@ function scheduleToEvent(schedule, index) {
 
 function getFilteredEvents(events, selectedGrades, selectedTags) {
   if (selectedGrades.length === 0 && selectedTags.length === 0) return events;
-
   return events.filter(({ extendedProps: { grade, tags } }) => {
     const gradeOk = selectedGrades.length === 0 || selectedGrades.some((g) => grade.includes(g));
     const tagOk = selectedTags.length === 0 || selectedTags.some((t) => tags.includes(t));
@@ -165,31 +225,62 @@ function getFilteredEvents(events, selectedGrades, selectedTags) {
 }
 
 function getEventsForDate(events, dateStr) {
-  return events.filter((ev) => {
-    const start = getDatePart(ev.start);
-    const end = getDatePart(ev.end);
-
+  return events.filter((event) => {
+    const start = getDatePart(event.start);
+    const end = getDatePart(event.end);
     if (!start) return false;
     if (!end || start === end) return start === dateStr;
     return dateStr >= start && dateStr < end;
   });
 }
 
-function AgendaCard({ event, isLast }) {
-  const { description, tags } = event.extendedProps;
+function getDeadlineBadge(applyEndDate) {
+  if (!applyEndDate) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const end = new Date(`${applyEndDate}T23:59:59`);
+  const diff = Math.ceil((end - today) / 86_400_000);
+  if (diff < 0) return 'closed';
+  if (diff <= 3) return 'imminent';
+  return null;
+}
+
+function AgendaCard({ event, isLast, onDetail }) {
+  const { description, tags, applyEndDate, author } = event.extendedProps;
+  const badge = getDeadlineBadge(applyEndDate);
 
   return (
     <div>
-      <div className="py-4 flex gap-3 items-stretch">
-        <div className="w-1 rounded-full shrink-0" style={{ backgroundColor: event.backgroundColor }} />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-800 leading-snug">{event.title}</p>
-          <p className="text-xs text-gray-400 mt-1 leading-relaxed">{description}</p>
-          <div className="flex flex-wrap gap-1.5 mt-2.5">
+      <button
+        className="group flex w-full gap-3 rounded-lg py-4 text-left transition-colors hover:bg-indigo-50/60"
+        onClick={onDetail}
+      >
+        <div className="w-1 shrink-0 rounded-full self-stretch" style={{ backgroundColor: event.backgroundColor }} />
+        <div className="min-w-0 flex-1">
+          <div className="mb-0.5 flex flex-wrap items-center gap-1.5">
+            <p className="text-sm font-semibold leading-snug text-gray-800">{event.title}</p>
+            {badge === 'closed' && (
+              <span className="rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-bold text-gray-500">
+                마감
+              </span>
+            )}
+            {badge === 'imminent' && (
+              <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-600">
+                마감 임박
+              </span>
+            )}
+          </div>
+          {description && (
+            <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-gray-400">
+              {description.replace(/\n/g, ' ')}
+            </p>
+          )}
+          {author && <p className="mt-1 text-xs text-gray-400">작성자 {author}</p>}
+          <div className="mt-2 flex flex-wrap gap-1">
             {tags.map((tag) => (
               <span
                 key={tag}
-                className="px-2.5 py-0.5 text-xs font-medium rounded-full"
+                className="rounded-full px-2 py-0.5 text-[10px] font-medium"
                 style={{ backgroundColor: event.backgroundColor + '22', color: event.backgroundColor }}
               >
                 #{tag}
@@ -197,7 +288,12 @@ function AgendaCard({ event, isLast }) {
             ))}
           </div>
         </div>
-      </div>
+        <div className="flex shrink-0 items-center text-gray-300 transition-colors group-hover:text-indigo-400">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </button>
       {!isLast && <div className="h-px bg-gray-100" />}
     </div>
   );
@@ -206,34 +302,34 @@ function AgendaCard({ event, isLast }) {
 function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTagChange, onClose }) {
   return (
     <div
-      className="calendar-filter-popup absolute z-50 bg-white rounded-2xl shadow-xl border border-gray-100 p-5"
+      className="calendar-filter-popup absolute z-50 rounded-2xl border border-gray-100 bg-white p-5 shadow-xl"
       style={{ top: '62px', right: '8px', width: '288px', maxWidth: 'calc(100vw - 24px)' }}
     >
-      <div className="flex items-center justify-between mb-1">
+      <div className="mb-1 flex items-center justify-between">
         <h3 className="text-sm font-bold text-gray-800">캘린더 필터</h3>
         <button
           onClick={onClose}
-          className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors text-lg leading-none"
+          className="flex h-7 w-7 items-center justify-center rounded-full text-lg leading-none text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
         >
           x
         </button>
       </div>
-      <p className="text-xs text-gray-400 mb-4">표시할 캘린더를 선택하세요.</p>
+      <p className="mb-4 text-xs text-gray-400">표시할 캘린더를 선택하세요.</p>
 
       <div className="mb-4">
-        <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-2.5">학년</p>
+        <p className="mb-2.5 text-[10px] font-bold uppercase tracking-widest text-indigo-600">학년</p>
         <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
-          <label className="flex items-center gap-2 cursor-pointer select-none">
+          <label className="flex cursor-pointer select-none items-center gap-2">
             <input
               type="checkbox"
               checked={selectedGrades.length === 0}
               onChange={() => onGradeChange([])}
-              className="w-4 h-4 accent-indigo-600"
+              className="h-4 w-4 accent-indigo-600"
             />
             <span className="text-sm text-gray-600">전체</span>
           </label>
           {ALL_GRADES.map((grade) => (
-            <label key={grade} className="flex items-center gap-2 cursor-pointer select-none">
+            <label key={grade} className="flex cursor-pointer select-none items-center gap-2">
               <input
                 type="checkbox"
                 checked={selectedGrades.includes(grade)}
@@ -245,7 +341,7 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTa
                     return next.length === ALL_GRADES.length ? [] : next;
                   })
                 }
-                className="w-4 h-4 accent-indigo-600"
+                className="h-4 w-4 accent-indigo-600"
               />
               <span className="text-sm text-gray-600">{grade}</span>
             </label>
@@ -253,10 +349,10 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTa
         </div>
       </div>
 
-      <div className="h-px bg-gray-100 mb-4" />
+      <div className="mb-4 h-px bg-gray-100" />
 
       <div>
-        <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-2.5">태그</p>
+        <p className="mb-2.5 text-[10px] font-bold uppercase tracking-widest text-indigo-600">태그</p>
         <div className="flex flex-wrap gap-2">
           {ALL_TAGS.map((tag) => {
             const isSelected = selectedTags.includes(tag);
@@ -268,10 +364,10 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTa
                     prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
                   )
                 }
-                className={`px-3 py-1 text-xs font-semibold rounded-full border transition-all active:scale-95 ${
+                className={`rounded-full border px-3 py-1 text-xs font-semibold transition-all active:scale-95 ${
                   isSelected
-                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                    : 'bg-white text-gray-500 border-gray-200 hover:border-indigo-400 hover:text-indigo-600'
+                    ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
+                    : 'border-gray-300 bg-white text-gray-600 hover:border-indigo-400 hover:text-indigo-600'
                 }`}
               >
                 {tag}
@@ -287,7 +383,7 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTa
             onGradeChange([]);
             onTagChange([]);
           }}
-          className="mt-4 w-full text-xs text-indigo-600 hover:text-indigo-800 font-semibold py-2 border border-indigo-200 rounded-xl hover:bg-indigo-50 transition-all"
+          className="mt-4 w-full rounded-lg border border-indigo-200 py-2 text-xs font-semibold text-indigo-600 transition-all hover:bg-indigo-50 hover:text-indigo-800"
         >
           필터 초기화
         </button>
@@ -307,12 +403,14 @@ export default function Home() {
   const [selectedTags, setSelectedTags] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [scheduleError, setScheduleError] = useState('');
+  const [detailEvents, setDetailEvents] = useState(EVENTS_DATA);
+  const [panelView, setPanelView] = useState('list');
+  const [detailEventId, setDetailEventId] = useState(null);
 
   const hasActiveFilters = selectedGrades.length > 0 || selectedTags.length > 0;
 
   const loadSchedules = async () => {
     setScheduleError('');
-
     try {
       const response = await fetch(`${API_BASE_URL}/api/schedules`);
       const data = await response.json().catch(() => ({}));
@@ -334,11 +432,10 @@ export default function Home() {
 
   useEffect(() => {
     if (!isFilterOpen) return;
-
-    const handler = (e) => {
+    const handler = (event) => {
       const popup = document.querySelector('.calendar-filter-popup');
-      const btn = document.querySelector('.fc-filterBtn-button');
-      if (popup && !popup.contains(e.target) && (!btn || !btn.contains(e.target))) {
+      const button = document.querySelector('.fc-filterBtn-button');
+      if (popup && !popup.contains(event.target) && (!button || !button.contains(event.target))) {
         setIsFilterOpen(false);
       }
     };
@@ -346,22 +443,25 @@ export default function Home() {
     return () => document.removeEventListener('mousedown', handler);
   }, [isFilterOpen]);
 
-  const events = useMemo(
-    () => schedules.map((schedule, index) => scheduleToEvent(schedule, index)),
+  const calendarEvents = useMemo(
+    () => schedules.map((schedule, index) => scheduleToCalendarEvent(schedule, index)),
     [schedules],
   );
-  const filteredEvents = useMemo(
-    () => getFilteredEvents(events, selectedGrades, selectedTags),
-    [events, selectedGrades, selectedTags],
+  const filteredCalendarEvents = useMemo(
+    () => getFilteredEvents(calendarEvents, selectedGrades, selectedTags),
+    [calendarEvents, selectedGrades, selectedTags],
   );
-  const detailEvents = useMemo(
-    () => getFilteredEvents(DETAIL_EVENTS, selectedGrades, selectedTags),
-    [selectedGrades, selectedTags],
+  const filteredDetailEvents = useMemo(
+    () => getFilteredEvents(detailEvents, selectedGrades, selectedTags),
+    [detailEvents, selectedGrades, selectedTags],
   );
   const agendaEvents = useMemo(
-    () => getEventsForDate(detailEvents, selectedDate),
-    [detailEvents, selectedDate],
+    () => getEventsForDate(filteredDetailEvents, selectedDate),
+    [filteredDetailEvents, selectedDate],
   );
+  const detailEvent = detailEventId
+    ? detailEvents.find((event) => event.id === detailEventId) ?? null
+    : null;
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -370,71 +470,150 @@ export default function Home() {
     navigate('/login');
   };
 
-  const handleDateClick = ({ dateStr }) => setSelectedDate(dateStr);
-  const handleEventClick = ({ event }) => setSelectedDate(event.startStr.slice(0, 10));
+  const handleDateClick = ({ dateStr }) => {
+    setSelectedDate(dateStr);
+    setPanelView('list');
+    setDetailEventId(null);
+  };
+
+  const handleCalendarEventClick = ({ event }) => {
+    setSelectedDate(event.startStr.slice(0, 10));
+    setPanelView('list');
+    setDetailEventId(null);
+  };
+
+  const handleShowDetail = (eventId) => {
+    setDetailEventId(eventId);
+    setPanelView('detail');
+  };
+
+  const handleBackToList = () => {
+    setPanelView('list');
+    setDetailEventId(null);
+  };
+
+  const handleEventReaction = (eventId, reaction) => {
+    setDetailEvents((prev) =>
+      prev.map((event) => {
+        if (event.id !== eventId) return event;
+        const nextProps = { ...event.extendedProps };
+        if (nextProps.userReaction === reaction) {
+          reaction === 'like' ? nextProps.likes-- : nextProps.dislikes--;
+          nextProps.userReaction = null;
+        } else {
+          if (nextProps.userReaction === 'like') nextProps.likes--;
+          if (nextProps.userReaction === 'dislike') nextProps.dislikes--;
+          reaction === 'like' ? nextProps.likes++ : nextProps.dislikes++;
+          nextProps.userReaction = reaction;
+        }
+        return { ...event, extendedProps: nextProps };
+      }),
+    );
+  };
+
+  const handleCommentReaction = (eventId, commentId, reaction) => {
+    setDetailEvents((prev) =>
+      prev.map((event) => {
+        if (event.id !== eventId) return event;
+        const comments = event.extendedProps.comments.map((comment) => {
+          if (comment.id !== commentId) return comment;
+          const nextComment = { ...comment };
+          if (nextComment.userReaction === reaction) {
+            reaction === 'like' ? nextComment.likes-- : nextComment.dislikes--;
+            nextComment.userReaction = null;
+          } else {
+            if (nextComment.userReaction === 'like') nextComment.likes--;
+            if (nextComment.userReaction === 'dislike') nextComment.dislikes--;
+            reaction === 'like' ? nextComment.likes++ : nextComment.dislikes++;
+            nextComment.userReaction = reaction;
+          }
+          return nextComment;
+        });
+        return { ...event, extendedProps: { ...event.extendedProps, comments } };
+      }),
+    );
+  };
+
+  const handleAddComment = (eventId, content) => {
+    const newComment = {
+      id: Date.now(),
+      author: user?.name ?? '익명',
+      content,
+      createdAt: formatNow(),
+      likes: 0,
+      dislikes: 0,
+      userReaction: null,
+    };
+
+    setDetailEvents((prev) =>
+      prev.map((event) =>
+        event.id !== eventId
+          ? event
+          : {
+              ...event,
+              extendedProps: {
+                ...event.extendedProps,
+                comments: [...event.extendedProps.comments, newComment],
+              },
+            },
+      ),
+    );
+  };
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 overflow-hidden">
-      <header className="shrink-0 bg-white border-b border-gray-100 px-6 z-10">
-        <div className="h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-indigo-600 rounded-xl flex items-center justify-center shadow-sm">
-              <span className="text-white text-sm font-extrabold">C</span>
-            </div>
-            <div>
-              <span className="text-base font-extrabold text-gray-800 tracking-tight">COM:HUB</span>
-              <span className="text-gray-300 mx-2 text-xs">/</span>
-              <span className="text-sm text-gray-500 font-medium">캘린더</span>
-            </div>
+    <div className="flex h-screen flex-col overflow-hidden bg-white">
+      <header className="z-10 flex h-16 shrink-0 items-center justify-between border-b border-gray-100 bg-white px-6">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 shadow-sm">
+            <span className="text-sm font-extrabold text-white">C</span>
           </div>
+          <span className="text-xl font-extrabold tracking-tight text-gray-800">COM:HUB</span>
+        </div>
 
-          <div className="flex items-center gap-2.5">
-            {user ? (
-              <>
-                <button
-                  onClick={() => setIsAddModalOpen(true)}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 active:scale-95 transition-all shadow-sm"
-                >
-                  <span className="text-base leading-none">+</span>
-                  <span>새 일정 등록</span>
-                </button>
-
-                <button
-                  onClick={() => navigate('/profile')}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 rounded-full hover:bg-indigo-100 active:scale-95 transition-all"
-                >
-                  <div className="w-6 h-6 bg-indigo-200 rounded-full flex items-center justify-center overflow-hidden">
-                    {user.profileImage ? (
-                      <img src={user.profileImage} alt="프로필" className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-xs font-bold text-indigo-700">{user.name?.charAt(0)}</span>
-                    )}
-                  </div>
-                  <span className="text-sm font-semibold text-indigo-700">{user.name}님</span>
-                </button>
-
-                <button
-                  onClick={handleLogout}
-                  className="px-3 py-1.5 text-sm font-medium text-gray-400 border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-gray-600 active:scale-95 transition-all"
-                >
-                  로그아웃
-                </button>
-              </>
-            ) : (
+        <div className="flex items-center gap-3">
+          {user ? (
+            <>
               <button
-                onClick={() => navigate('/login')}
-                className="px-4 py-1.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 active:scale-95 transition-all shadow-sm"
+                onClick={() => setIsAddModalOpen(true)}
+                className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-700 active:scale-95"
               >
-                로그인
+                <span className="text-base leading-none">+</span>
+                <span>새 일정 등록</span>
               </button>
-            )}
-          </div>
+              <button
+                onClick={() => navigate('/profile')}
+                className="flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1.5 transition-all hover:bg-indigo-100 active:scale-95"
+              >
+                <div className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-indigo-200">
+                  {user.profileImage ? (
+                    <img src={user.profileImage} alt="프로필" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-xs font-bold text-indigo-700">{user.name?.charAt(0)}</span>
+                  )}
+                </div>
+                <span className="text-sm font-semibold text-indigo-800">{user.name}님</span>
+              </button>
+              <button
+                onClick={handleLogout}
+                className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-500 transition-all hover:bg-gray-50 hover:text-gray-700 active:scale-95"
+              >
+                로그아웃
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => navigate('/login')}
+              className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-700 active:scale-95"
+            >
+              로그인
+            </button>
+          )}
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden min-h-0 p-4 gap-4">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         <section
-          className={`bg-white rounded-2xl shadow-sm border border-gray-100 overflow-y-auto p-5 relative ${
+          className={`relative overflow-y-auto bg-white p-5 ${
             hasActiveFilters ? 'calendar-has-filters' : ''
           }`}
           style={{ flex: '7 7 0' }}
@@ -459,9 +638,9 @@ export default function Home() {
             plugins={[dayGridPlugin, interactionPlugin]}
             initialView="dayGridMonth"
             locale="ko"
-            events={filteredEvents}
+            events={filteredCalendarEvents}
             dateClick={handleDateClick}
-            eventClick={handleEventClick}
+            eventClick={handleCalendarEventClick}
             eventCursor="pointer"
             height="auto"
             customButtons={{
@@ -481,38 +660,56 @@ export default function Home() {
         </section>
 
         <aside
-          className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-y-auto flex flex-col"
+          className="flex flex-col overflow-hidden border-l border-gray-200 bg-gray-50"
           style={{ flex: '3 3 0' }}
         >
-          <div className="sticky top-0 bg-white px-6 pt-6 pb-4 border-b border-gray-100 z-10 rounded-t-2xl">
-            <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-1.5">
-              Daily Agenda
-            </p>
-            <h2 className="text-lg font-extrabold text-gray-800 leading-tight">
-              {formatDateLabel(selectedDate)}
-            </h2>
-            <p className="text-xs text-gray-400 mt-1">
-              {agendaEvents.length > 0 ? `총 ${agendaEvents.length}개의 일정` : '일정 없음'}
-            </p>
-          </div>
-
-          <div className="px-6 py-2 flex-1">
-            {agendaEvents.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full py-16 text-center select-none">
-                <div className="text-4xl mb-3">-</div>
-                <p className="text-sm font-semibold text-gray-500">예정된 일정이 없습니다.</p>
-                <p className="text-xs text-gray-400 mt-1.5">달력에서 다른 날짜를 클릭해 보세요.</p>
+          {panelView === 'list' ? (
+            <div className="flex h-full flex-col overflow-hidden">
+              <div className="shrink-0 border-b border-gray-200 bg-gray-50 px-6 pb-4 pt-6">
+                <p className="mb-1 text-xs font-bold uppercase tracking-widest text-indigo-500">
+                  Daily Agenda
+                </p>
+                <h2 className="text-2xl font-extrabold leading-tight text-gray-800">
+                  {formatDateLabel(selectedDate)}
+                </h2>
+                <p className="mt-1.5 text-xs text-gray-400">
+                  {agendaEvents.length > 0 ? `총 ${agendaEvents.length}개의 일정` : '일정 없음'}
+                </p>
               </div>
-            ) : (
-              agendaEvents.map((ev, index) => (
-                <AgendaCard
-                  key={ev.id}
-                  event={ev}
-                  isLast={index === agendaEvents.length - 1}
-                />
-              ))
-            )}
-          </div>
+
+              <div className="flex-1 overflow-y-auto px-6 py-2">
+                {agendaEvents.length === 0 ? (
+                  <div className="flex h-full select-none flex-col items-center justify-center py-16 text-center">
+                    <div className="mb-3 text-4xl">-</div>
+                    <p className="text-sm font-semibold text-gray-500">예정된 일정이 없습니다.</p>
+                    <p className="mt-1.5 text-xs text-gray-400">
+                      달력에서 다른 날짜를 클릭해 보세요.
+                    </p>
+                  </div>
+                ) : (
+                  agendaEvents.map((event, index) => (
+                    <AgendaCard
+                      key={event.id}
+                      event={event}
+                      isLast={index === agendaEvents.length - 1}
+                      onDetail={() => handleShowDetail(event.id)}
+                    />
+                  ))
+                )}
+              </div>
+            </div>
+          ) : detailEvent ? (
+            <EventDetailPanel
+              event={detailEvent}
+              onBack={handleBackToList}
+              onReact={(reaction) => handleEventReaction(detailEventId, reaction)}
+              onCommentReact={(commentId, reaction) =>
+                handleCommentReaction(detailEventId, commentId, reaction)
+              }
+              onAddComment={(content) => handleAddComment(detailEventId, content)}
+              user={user}
+            />
+          ) : null}
         </aside>
       </div>
 
