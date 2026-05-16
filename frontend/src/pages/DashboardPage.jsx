@@ -10,6 +10,7 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import EventAddModal from '../components/EventAddModal';
+import MemoAddModal from '../components/MemoAddModal';
 
 // ──────────────────────────────────────────────────────────────
 // 더미 이벤트 데이터
@@ -158,10 +159,27 @@ export default function DashboardPage() {
   
   // 새 일정 모달 상태 및 로컬에 저장된 커스텀 이벤트들 불러오기
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [localEvents, setLocalEvents] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('local_events')) || []; }
-    catch { return []; }
-  });
+  const [isMemoModalOpen, setIsMemoModalOpen] = useState(false);
+
+  const loadLocalData = () => {
+    try {
+      const events = JSON.parse(localStorage.getItem('local_events')) || [];
+      const memos = JSON.parse(localStorage.getItem('local_memos')) || [];
+      const adjustedMemos = memos.map(m => {
+        if (m.allDay && m.end) {
+          const d = new Date(`${m.end}T00:00:00`);
+          d.setDate(d.getDate() + 1);
+          return { ...m, end: [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-') };
+        }
+        return m;
+      });
+      return [...events, ...adjustedMemos];
+    } catch {
+      return [];
+    }
+  };
+
+  const [localEvents, setLocalEvents] = useState(loadLocalData);
 
   const allEvents = [...EVENTS, ...localEvents];
 
@@ -200,6 +218,15 @@ export default function DashboardPage() {
           {user ? (
             // ── 로그인 상태 ──────────────────────────────────────
             <>
+              {/* 새 메모 등록 버튼 */}
+              <button 
+                onClick={() => setIsMemoModalOpen(true)}
+                className="flex items-center gap-1.5 px-4 py-2 border border-primary-200 bg-primary-50 text-primary-700 text-sm font-semibold rounded-lg hover:bg-primary-100 active:scale-95 transition-all shadow-sm"
+              >
+                <span className="text-base leading-none">+</span>
+                <span>새 메모 등록</span>
+              </button>
+
               {/* 새 일정 등록 버튼 */}
               <button 
                 onClick={() => setIsAddModalOpen(true)}
@@ -282,10 +309,12 @@ export default function DashboardPage() {
       <EventAddModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        onCreated={() => {
-          const updated = JSON.parse(localStorage.getItem('local_events') || '[]');
-          setLocalEvents(updated);
-        }}
+        onCreated={() => setLocalEvents(loadLocalData())}
+      />
+      <MemoAddModal
+        isOpen={isMemoModalOpen}
+        onClose={() => setIsMemoModalOpen(false)}
+        onCreated={() => setLocalEvents(loadLocalData())}
       />
     </div>
   );
