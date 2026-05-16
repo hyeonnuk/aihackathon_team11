@@ -3,7 +3,7 @@
 //  일정 상세 패널 — 정보, 좋아요/싫어요, 댓글
 // ============================================================
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -63,42 +63,237 @@ function SmallReactionBtn({ emoji, count, isActive, onClick }) {
   );
 }
 
-function CommentCard({ comment, onReact }) {
+function CommentCard({
+  comment,
+  user,
+  onReact,
+  onEditComment,
+  onDeleteComment,
+  onAddReply,
+  onEditReply,
+  onDeleteReply,
+  onReplyReact,
+  isReply = false,
+  parentId = null,
+}) {
+  const [isReplying, setIsReplying] = useState(false);
+  const [replyContent, setReplyContent] = useState('');
+
+  // 로컬 상태 추가: UI에 수정/삭제/대댓글 등록을 즉각적으로 반영하기 위함
+  const [localContent, setLocalContent] = useState(comment.content);
+  const [localIsDeleted, setLocalIsDeleted] = useState(comment.isDeleted);
+  const [localIsEdited, setLocalIsEdited] = useState(comment.isEdited || false);
+  const [localReplies, setLocalReplies] = useState(comment.replies || []);
+
+  // 좋아요, 싫어요, 유저 반응 로컬 상태 추가
+  const [localLikes, setLocalLikes] = useState(comment.likes || 0);
+  const [localDislikes, setLocalDislikes] = useState(comment.dislikes || 0);
+  const [localUserReaction, setLocalUserReaction] = useState(comment.userReaction || null);
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(comment.content);
+
+  // 상위에서 새로운 댓글 데이터가 넘어올 경우 동기화
+  useEffect(() => {
+    setLocalContent(comment.content);
+    setLocalIsDeleted(comment.isDeleted);
+    setLocalIsEdited(comment.isEdited || false);
+    setLocalReplies(comment.replies || []);
+    setEditContent(comment.content);
+    setLocalLikes(comment.likes || 0);
+    setLocalDislikes(comment.dislikes || 0);
+    setLocalUserReaction(comment.userReaction || null);
+  }, [comment.id, comment.content, comment.isDeleted, comment.isEdited, comment.likes, comment.dislikes, comment.userReaction, JSON.stringify(comment.replies)]);
+
+  const isAuthor = user && (user.id === comment.authorId || user.name === comment.author);
+
+  const handleEditSubmit = () => {
+    if (!editContent.trim()) return;
+    
+    setLocalContent(editContent);
+    setLocalIsEdited(true);
+
+    if (isReply) {
+      if (onEditReply) onEditReply(parentId, comment.id, editContent);
+    } else {
+      if (onEditComment) onEditComment(comment.id, editContent);
+    }
+    setIsEditing(false);
+  };
+
+  const handleDelete = () => {
+    if (window.confirm('정말 삭제하시겠습니까?')) {
+      setLocalIsDeleted(true);
+      if (isReply) {
+        if (onDeleteReply) onDeleteReply(parentId, comment.id);
+      } else {
+        if (onDeleteComment) onDeleteComment(comment.id);
+      }
+    }
+  };
+
+  const handleReplySubmit = () => {
+    if (!replyContent.trim()) return;
+
+    const newReply = {
+      id: `reply_${Date.now()}`,
+      content: replyContent,
+      author: user?.name || '익명',
+      authorId: user?.id,
+      createdAt: '방금 전',
+      likes: 0,
+      dislikes: 0,
+    };
+    setLocalReplies((prev) => [...prev, newReply]);
+
+    if (onAddReply) onAddReply(comment.id, replyContent);
+    setReplyContent('');
+    setIsReplying(false);
+  };
+
+  // 좋아요/싫어요 반응 즉시 반영 및 서버 연동 함수 호출
+  const handleReaction = (type) => {
+    // 화면 즉시 반영 (Optimistic UI)
+    if (localUserReaction === type) {
+      // 이미 누른 반응 취소
+      if (type === 'like') setLocalLikes((prev) => Math.max(0, prev - 1));
+      if (type === 'dislike') setLocalDislikes((prev) => Math.max(0, prev - 1));
+      setLocalUserReaction(null);
+    } else {
+      // 새로운 반응 추가 또는 변경
+      if (type === 'like') {
+        setLocalLikes((prev) => prev + 1);
+        if (localUserReaction === 'dislike') setLocalDislikes((prev) => Math.max(0, prev - 1));
+      } else {
+        setLocalDislikes((prev) => prev + 1);
+        if (localUserReaction === 'like') setLocalLikes((prev) => Math.max(0, prev - 1));
+      }
+      setLocalUserReaction(type);
+    }
+
+    // 부모 이벤트 호출 (API 연동을 위함)
+    if (isReply) {
+      if (onReplyReact) onReplyReact(parentId, comment.id, type);
+    } else {
+      if (onReact) onReact(comment.id, type);
+    }
+  };
+
+  const displayContent = localIsDeleted ? '삭제된 내용입니다.' : localContent;
+
   return (
-    <div className="py-4">
+    <div className={`py-3 ${isReply ? 'ml-8 mt-2 pl-4 border-l-2 border-gray-100' : 'py-4'}`}>
       {/* 댓글 헤더 */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
             <span className="text-[10px] font-bold text-indigo-600">
-              {comment.author.charAt(0)}
+              {comment.author ? comment.author.charAt(0) : '?'}
             </span>
           </div>
           <span className="text-xs font-semibold text-gray-700">{comment.author}</span>
         </div>
-        <span className="text-[10px] text-gray-400">{comment.createdAt}</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-gray-400">{comment.createdAt}</span>
+          {localIsEdited && !localIsDeleted && (
+            <span className="text-[10px] text-gray-400">(수정됨)</span>
+          )}
+          {isAuthor && !localIsDeleted && (
+            <div className="flex items-center gap-1">
+              <button onClick={() => setIsEditing(!isEditing)} className="text-[10px] text-gray-400 hover:text-indigo-600 transition-colors">수정</button>
+              <button onClick={handleDelete} className="text-[10px] text-gray-400 hover:text-red-600 transition-colors">삭제</button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 댓글 내용 */}
-      <p className="text-sm text-gray-700 leading-relaxed pl-8 whitespace-pre-wrap break-words">
-        {comment.content}
-      </p>
+      {!isEditing ? (
+        <p className={`text-sm leading-relaxed pl-8 whitespace-pre-wrap break-words ${localIsDeleted ? 'text-gray-400 italic' : 'text-gray-700'}`}>
+          {displayContent}
+        </p>
+      ) : (
+        <div className="pl-8 mt-2 flex flex-col gap-2">
+          <textarea
+            className="w-full text-sm border border-gray-200 rounded-lg p-2 focus:outline-none focus:border-indigo-500"
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            rows={2}
+          />
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setIsEditing(false)} className="text-xs text-gray-500">취소</button>
+            <button onClick={handleEditSubmit} className="text-xs font-bold text-indigo-600">저장</button>
+          </div>
+        </div>
+      )}
 
-      {/* 댓글 반응 */}
-      <div className="flex items-center gap-2 mt-2 pl-8">
-        <SmallReactionBtn
-          emoji="👍"
-          count={comment.likes}
-          isActive={comment.userReaction === 'like'}
-          onClick={() => onReact(comment.id, 'like')}
-        />
-        <SmallReactionBtn
-          emoji="👎"
-          count={comment.dislikes}
-          isActive={comment.userReaction === 'dislike'}
-          onClick={() => onReact(comment.id, 'dislike')}
-        />
-      </div>
+      {!localIsDeleted && (
+        <div className="flex items-center gap-2 mt-2 pl-8">
+          <SmallReactionBtn
+            emoji="👍"
+            count={localLikes}
+            isActive={localUserReaction === 'like'}
+            onClick={() => handleReaction('like')}
+          />
+          <SmallReactionBtn
+            emoji="👎"
+            count={localDislikes}
+            isActive={localUserReaction === 'dislike'}
+            onClick={() => handleReaction('dislike')}
+          />
+          {!isReply && user && (
+            <button
+              onClick={() => setIsReplying(!isReplying)}
+              className="ml-2 text-[10px] font-semibold text-gray-500 hover:text-indigo-600 transition-colors"
+            >
+              답글 달기
+            </button>
+          )}
+        </div>
+      )}
+
+      {isReplying && (
+        <div className="pl-8 mt-3 flex gap-2 items-start">
+          <div className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center shrink-0 mt-1">
+             <span className="text-[8px] font-bold text-indigo-600">{user.name.charAt(0)}</span>
+          </div>
+          <div className="flex-1 flex flex-col gap-2">
+            <textarea
+              className="w-full text-sm border border-gray-200 rounded-lg p-2 focus:outline-none focus:border-indigo-500"
+              placeholder="답글을 입력하세요..."
+              value={replyContent}
+              onChange={(e) => setReplyContent(e.target.value)}
+              rows={2}
+            />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setIsReplying(false)} className="text-xs text-gray-500">취소</button>
+              <button onClick={handleReplySubmit} className="text-xs font-bold text-indigo-600">등록</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 대댓글 렌더링 */}
+      {localReplies && localReplies.length > 0 && (
+        <div className="mt-2">
+          {localReplies.map(reply => (
+            <CommentCard
+              key={reply.id}
+              comment={reply}
+              user={user}
+              isReply={true}
+              parentId={comment.id}
+              onReact={onReact}
+              onEditComment={onEditComment}
+              onDeleteComment={onDeleteComment}
+              onAddReply={onAddReply}
+              onEditReply={onEditReply}
+              onDeleteReply={onDeleteReply}
+              onReplyReact={onReplyReact}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -110,19 +305,149 @@ export default function EventDetailPanel({
   onReact,
   onCommentReact,
   onAddComment,
+  onEditComment,
+  onDeleteComment,
+  onAddReply,
+  onEditReply,
+  onDeleteReply,
+  onReplyReact,
   onEdit,
   onDelete,
   user,
 }) {
   const [commentText, setCommentText] = useState('');
   const ep = event.extendedProps;
+  const [prevEventId, setPrevEventId] = useState(event.id);
+
+  const [localComments, setLocalComments] = useState(() => {
+    try {
+      const stored = localStorage.getItem(`comments_${event.id}`);
+      return stored ? JSON.parse(stored) : (ep.comments || []);
+    } catch {
+      return ep.comments || [];
+    }
+  });
+
+  // 이벤트가 변경되었을 때 다른 일정의 댓글로 덮어씌워지는 것을 방지 (즉시 동기화)
+  if (event.id !== prevEventId) {
+    setPrevEventId(event.id);
+    setCommentText(''); // 입력 중이던 댓글 초기화
+    try {
+      const stored = localStorage.getItem(`comments_${event.id}`);
+      setLocalComments(stored ? JSON.parse(stored) : (ep.comments || []));
+    } catch {
+      setLocalComments(ep.comments || []);
+    }
+  }
+
+  useEffect(() => {
+    localStorage.setItem(`comments_${event.id}`, JSON.stringify(localComments));
+  }, [localComments, event.id]);
+
+  // 하위 컴포넌트 이벤트 래핑(Intercept) : 부모의 로컬 상태(저장소)를 업데이트하기 위함
+  const handleInterceptEditComment = (id, content) => {
+    setLocalComments(prev => prev.map(c => c.id === id ? { ...c, content, isEdited: true } : c));
+    if (onEditComment) onEditComment(id, content);
+  };
+
+  const handleInterceptDeleteComment = (id) => {
+    setLocalComments(prev => prev.map(c => c.id === id ? { ...c, isDeleted: true } : c));
+    if (onDeleteComment) onDeleteComment(id);
+  };
+
+  const handleInterceptAddReply = (parentId, content) => {
+    setLocalComments(prev => prev.map(c => {
+      if (c.id === parentId) {
+        const newReply = {
+          id: `reply_${Date.now()}`,
+          content,
+          author: user?.name || '익명',
+          authorId: user?.id,
+          createdAt: '방금 전',
+          likes: 0,
+          dislikes: 0,
+        };
+        return { ...c, replies: [...(c.replies || []), newReply] };
+      }
+      return c;
+    }));
+    if (onAddReply) onAddReply(parentId, content);
+  };
+
+  const handleInterceptEditReply = (parentId, replyId, content) => {
+    setLocalComments(prev => prev.map(c => c.id === parentId ? { ...c, replies: (c.replies || []).map(r => r.id === replyId ? { ...r, content, isEdited: true } : r) } : c));
+    if (onEditReply) onEditReply(parentId, replyId, content);
+  };
+
+  const handleInterceptDeleteReply = (parentId, replyId) => {
+    setLocalComments(prev => prev.map(c => c.id === parentId ? { ...c, replies: (c.replies || []).map(r => r.id === replyId ? { ...r, isDeleted: true } : r) } : c));
+    if (onDeleteReply) onDeleteReply(parentId, replyId);
+  };
+
+  const handleInterceptCommentReact = (id, type) => {
+    setLocalComments(prev => prev.map(c => {
+      if (c.id === id) {
+        let likes = c.likes || 0;
+        let dislikes = c.dislikes || 0;
+        let userReaction = c.userReaction;
+        if (userReaction === type) {
+          if (type === 'like') likes = Math.max(0, likes - 1);
+          if (type === 'dislike') dislikes = Math.max(0, dislikes - 1);
+          userReaction = null;
+        } else {
+          if (type === 'like') { likes++; if (userReaction === 'dislike') dislikes = Math.max(0, dislikes - 1); }
+          else { dislikes++; if (userReaction === 'like') likes = Math.max(0, likes - 1); }
+          userReaction = type;
+        }
+        return { ...c, likes, dislikes, userReaction };
+      }
+      return c;
+    }));
+    if (onCommentReact) onCommentReact(id, type);
+  };
+
+  const handleInterceptReplyReact = (parentId, replyId, type) => {
+    setLocalComments(prev => prev.map(c => c.id === parentId ? { ...c, replies: (c.replies || []).map(r => {
+      if (r.id === replyId) {
+        let likes = r.likes || 0;
+        let dislikes = r.dislikes || 0;
+        let userReaction = r.userReaction;
+        if (userReaction === type) {
+          if (type === 'like') likes = Math.max(0, likes - 1);
+          if (type === 'dislike') dislikes = Math.max(0, dislikes - 1);
+          userReaction = null;
+        } else {
+          if (type === 'like') { likes++; if (userReaction === 'dislike') dislikes = Math.max(0, dislikes - 1); }
+          else { dislikes++; if (userReaction === 'like') likes = Math.max(0, likes - 1); }
+          userReaction = type;
+        }
+        return { ...r, likes, dislikes, userReaction };
+      }
+      return r;
+    }) } : c));
+    if (onReplyReact) onReplyReact(parentId, replyId, type);
+  };
+
   const badge = getDeadlineBadge(ep.applyEndDate);
   const dateRange = formatEventDateRange(event.start, event.end);
 
   const submitComment = () => {
     const text = commentText.trim();
     if (!text) return;
-    onAddComment(text);
+
+    const newComment = {
+      id: `comment_${Date.now()}`,
+      content: text,
+      author: user?.name || '익명',
+      authorId: user?.id,
+      createdAt: '방금 전',
+      likes: 0,
+      dislikes: 0,
+      replies: [],
+    };
+    setLocalComments((prev) => [...prev, newComment]);
+
+    if (onAddComment) onAddComment(text);
     setCommentText('');
   };
 
@@ -292,7 +617,7 @@ export default function EventDetailPanel({
         {/* 댓글 영역 */}
         <div>
           <p className="text-xs font-bold text-gray-700 mb-4">
-            💬 댓글 {ep.comments.length}개
+            💬 댓글 {localComments.length}개
           </p>
 
           {/* 댓글 입력 */}
@@ -303,39 +628,48 @@ export default function EventDetailPanel({
               </div>
               <input
                 type="text"
+                placeholder="댓글을 남겨보세요..."
+                className="flex-1 text-sm bg-transparent border-b border-gray-200 focus:outline-none focus:border-indigo-500 py-1 transition-colors"
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitComment(); } }}
-                placeholder="댓글을 입력하세요..."
-                className="flex-1 px-3 py-2 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-transparent bg-white"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                    submitComment();
+                  }
+                }}
               />
               <button
                 onClick={submitComment}
                 disabled={!commentText.trim()}
-                className="px-3 py-2 text-xs font-bold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0"
+                className="text-xs font-bold text-indigo-600 disabled:text-gray-300 transition-colors"
               >
-                작성
+                등록
               </button>
             </div>
           ) : (
-            <p className="text-xs text-gray-400 text-center py-3 mb-4 bg-gray-100 rounded-lg">
-              로그인 후 댓글을 작성할 수 있습니다.
-            </p>
+            <div className="text-xs text-center text-gray-400 mb-5 py-2 bg-gray-50 rounded-lg">
+              댓글을 작성하려면 로그인이 필요합니다.
+            </div>
           )}
 
           {/* 댓글 목록 */}
-          {ep.comments.length === 0 ? (
-            <p className="text-xs text-gray-400 text-center py-6">아직 댓글이 없습니다.</p>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {ep.comments.map((c) => (
-                <CommentCard key={c.id} comment={c} onReact={onCommentReact} />
-              ))}
-            </div>
-          )}
+          <div className="divide-y divide-gray-100">
+            {localComments?.map((comment) => (
+              <CommentCard
+                key={comment.id}
+                comment={comment}
+                user={user}
+                onReact={handleInterceptCommentReact}
+                onEditComment={handleInterceptEditComment}
+                onDeleteComment={handleInterceptDeleteComment}
+                onAddReply={handleInterceptAddReply}
+                onEditReply={handleInterceptEditReply}
+                onDeleteReply={handleInterceptDeleteReply}
+                onReplyReact={handleInterceptReplyReact}
+              />
+            ))}
+          </div>
         </div>
-
-        <div className="h-4" />
       </div>
     </div>
   );
