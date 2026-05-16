@@ -4,6 +4,7 @@ import '../App.css';
 import EventAddModal from '../components/EventAddModal';
 import EventDetailPanel from '../components/EventDetailPanel';
 import { TAG_COLORS, TAG_TEXT_COLORS, TAG_CHIP_COLORS, getTagColor } from '../constants/tagColors';
+import MemoAddModal from '../components/MemoAddModal';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
@@ -286,7 +287,8 @@ function mergeSyncedEvents(previousEvents, nextEvents) {
 }
 
 function getFilteredEvents(events, selectedGrades, selectedTags, showNoticeOnly) {
-  return events.filter(({ extendedProps: { grade, tags, notice } }) => {
+  return events.filter(({ extendedProps: { grade = [], tags = [], notice = false, isMemo = false } }) => {
+    if (isMemo) return true; // 메모는 캘린더 필터 설정에 관계없이 항상 보이도록 처리
     if (showNoticeOnly && !notice) return false;
     const gradeOk = selectedGrades.length === 0 || selectedGrades.some((g) => grade.includes(g));
     const tagOk = selectedTags.length === 0 || selectedTags.some((t) => tags.includes(t));
@@ -749,6 +751,8 @@ export default function Home() {
   const [user, setUser] = useState(getStoredUser);
   const [selectedDate, setSelectedDate] = useState(getTodayStr);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isMemoModalOpen, setIsMemoModalOpen] = useState(false);
+  const [editTargetMemo, setEditTargetMemo] = useState(null);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewingToday, setViewingToday] = useState(true);
   const [selectedGrades, setSelectedGrades] = useState([]);
@@ -768,6 +772,20 @@ export default function Home() {
   const loadSchedules = async (options = {}) => {
     const silent = options?.silent === true;
     if (!silent) setScheduleError('');
+
+    let localMemos = [];
+    try {
+      localMemos = JSON.parse(localStorage.getItem('local_memos') || '[]');
+    } catch (e) {
+      console.error(e);
+    }
+    const memoEvents = localMemos.map(memo => {
+      if (memo.allDay && memo.end) {
+        return { ...memo, end: addOneDay(memo.end) };
+      }
+      return memo;
+    });
+
     try {
       const response = await fetch(`${API_BASE_URL}/api/schedules`);
       const data = await response.json().catch(() => ({}));
@@ -778,11 +796,11 @@ export default function Home() {
 
       const nextEvents = (data.schedules || []).map((schedule) => scheduleToEvent(schedule));
       setScheduleError('');
-      setEvents((previousEvents) => mergeSyncedEvents(previousEvents, nextEvents));
+      setEvents((previousEvents) => mergeSyncedEvents(previousEvents, [...nextEvents, ...memoEvents]));
     } catch (error) {
       if (!silent) {
         setScheduleError(error.message);
-        setEvents([]);
+        setEvents(memoEvents);
       }
     }
   };
@@ -884,6 +902,32 @@ export default function Home() {
   const handleOpenEdit = (eventId) => {
     const event = events.find((e) => e.id === eventId);
     if (!event) return;
+
+    if (event.extendedProps?.isMemo) {
+      let endDateStr = event.end || event.start;
+      if (event.allDay && event.end) {
+        const d = new Date(`${event.end}T00:00:00`);
+        d.setDate(d.getDate() - 1);
+        endDateStr = [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
+      }
+      
+      const startSplit = event.start.split('T');
+      const endSplit = endDateStr.split('T');
+
+      setEditTargetMemo({
+        id: event.id,
+        title: event.title.replace('[메모] ', ''),
+        startDate: startSplit[0],
+        startTime: startSplit[1] ? startSplit[1].substring(0, 5) : '09:00',
+        endDate: endSplit[0],
+        endTime: endSplit[1] ? endSplit[1].substring(0, 5) : '10:00',
+        isAllDay: event.allDay || false,
+        content: event.extendedProps.description || ''
+      });
+      setIsMemoModalOpen(true);
+      return;
+    }
+
     setEditTargetEvent(event);
     setIsEditModalOpen(true);
   };
@@ -891,7 +935,17 @@ export default function Home() {
   const handleDeleteEvent = async (eventId) => {
     const event = events.find((e) => e.id === eventId);
     if (!event) return;
-    if (!window.confirm('이 일정을 삭제하시겠습니까?')) return;
+    const isMemo = event.extendedProps?.isMemo;
+    if (!window.confirm(isMemo ? '이 메모를 삭제하시겠습니까?' : '이 일정을 삭제하시겠습니까?')) return;
+
+    if (isMemo) {
+      const localMemos = JSON.parse(localStorage.getItem('local_memos') || '[]');
+      const updatedMemos = localMemos.filter((m) => m.id !== eventId);
+      localStorage.setItem('local_memos', JSON.stringify(updatedMemos));
+      setEvents((prev) => prev.filter((e) => e.id !== eventId));
+      handleBackToList();
+      return;
+    }
 
     const scheduleId = event.extendedProps.scheduleId;
 
@@ -1084,6 +1138,13 @@ export default function Home() {
         <div className="flex items-center gap-3">
           {user ? (
             <>
+              <button
+                onClick={() => { setEditTargetMemo(null); setIsMemoModalOpen(true); }}
+                className="flex items-center gap-1.5 rounded-lg border border-primary-200 bg-primary-50 px-4 py-2 text-sm font-semibold text-primary-700 shadow-sm transition-all hover:bg-primary-100 active:scale-95"
+              >
+                <span className="text-base leading-none">+</span>
+                <span>새 메모 등록</span>
+              </button>
               <button
                 onClick={() => setIsAddModalOpen(true)}
                 className="flex items-center gap-1.5 rounded-lg bg-primary-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-primary-600 active:scale-95"
@@ -1323,6 +1384,15 @@ export default function Home() {
         onCreated={() => { loadSchedules(); setIsEditModalOpen(false); }}
         mode="edit"
         initialData={editTargetEvent ? buildEditInitialData(editTargetEvent) : null}
+      />
+
+      <MemoAddModal
+        key={editTargetMemo?.id ?? 'memo-modal'}
+        isOpen={isMemoModalOpen}
+        onClose={() => { setIsMemoModalOpen(false); setEditTargetMemo(null); }}
+        onCreated={() => { loadSchedules(); setIsMemoModalOpen(false); }}
+        mode={editTargetMemo ? 'edit' : 'add'}
+        initialData={editTargetMemo}
       />
 
       <Toast message={toastMessage} onDismiss={() => setToastMessage('')} />
