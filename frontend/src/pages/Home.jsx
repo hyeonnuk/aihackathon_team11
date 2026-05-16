@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../App.css';
 import EventAddModal from '../components/EventAddModal';
@@ -479,6 +479,7 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTa
 
 export default function Home() {
   const navigate = useNavigate();
+  const calendarRef = useRef(null);
 
   const [user, setUser] = useState(getStoredUser);
   const [selectedDate, setSelectedDate] = useState(getTodayStr);
@@ -779,6 +780,7 @@ export default function Home() {
           )}
 
           <FullCalendar
+            ref={calendarRef}
             plugins={[dayGridPlugin, interactionPlugin]}
             initialView="dayGridMonth"
             locale="ko"
@@ -793,13 +795,22 @@ export default function Home() {
                 hint: '캘린더 필터',
                 click: () => setIsFilterOpen((prev) => !prev),
               },
+              todayBtn: {
+                text: '오늘',
+                click: () => {
+                  calendarRef.current?.getApi().today();
+                  setSelectedDate(getTodayStr());
+                  setPanelView('list');
+                  setDetailEventId(null);
+                },
+              },
             }}
             headerToolbar={{
-              left: 'prev,next today',
+              left: 'prev,next todayBtn',
               center: 'title',
               right: 'dayGridMonth,dayGridWeek filterBtn',
             }}
-            buttonText={{ today: '오늘', month: '월별', week: '주별' }}
+            buttonText={{ month: '월별', week: '주별' }}
             dayCellContent={(arg) => arg.date.getDate()}
             dayCellClassNames={(arg) => {
               const d = arg.date;
