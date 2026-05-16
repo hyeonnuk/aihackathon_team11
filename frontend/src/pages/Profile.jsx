@@ -67,6 +67,42 @@ const BADGE_GROUPS = [
   },
 ];
 
+const BADGE_TEXT = {
+  b1: { label: '아기 무한이', icon: '👶', description: '캘린더에 일정 1회 이상 등록' },
+  b2: { label: '어른 무한이', icon: '🧑', description: '캘린더 일정 10회 이상 등록' },
+  b3: { label: '할미 무한이', icon: '👵', description: '캘린더 일정 50회 이상 등록' },
+  b5: { label: '직진중인 무한이', icon: '🏃', description: '댓글 3회 이상 작성' },
+  b6: { label: '과속 무한이', icon: '💨', description: '댓글 5회 이상 작성' },
+  b7: { label: '폭주 무한이', icon: '🏍️', description: '댓글 10회 이상 작성' },
+  b12: { label: '똑똑한 무한이', icon: '🤓', description: '내 글에 좋아요 1회 이상 받기' },
+  b13: { label: '유능한 무한이', icon: '💼', description: '내 글에 좋아요 5회 이상 받기' },
+  b14: { label: '학사 무한이', icon: '🎓', description: '내 글에 좋아요 20회 이상 받기' },
+  b15: { label: '석사 무한이', icon: '📜', description: '내 글에 좋아요 40회 이상 받기' },
+  b16: { label: '박사 무한이', icon: '🔬', description: '내 글에 좋아요 100회 이상 받기' },
+  b9_1: { label: '해피 무한이', icon: '😊', description: '좋아요 1회 이상 누르기' },
+  b9: { label: '행복한 무한이', icon: '🥰', description: '좋아요 5회 이상 누르기' },
+  b10: { label: '도파민 무한이', icon: '🤩', description: '좋아요 10회 이상 누르기' },
+  b11: { label: '행복해서 쓰러진 무한이', icon: '🫠', description: '좋아요 30회 이상 누르기' },
+  b17: { label: '싫어하는 무한이', icon: '😒', description: '싫어요 5회 이상 누르기' },
+  b18: { label: '부정적인 무한이', icon: '😠', description: '싫어요 15회 이상 누르기' },
+  b19: { label: '모든게 싫은 무한이', icon: '🤬', description: '싫어요 30회 이상 누르기' },
+  b8: { label: '확성기 무한이', icon: '📢', description: '글에 1등 댓글 달기' },
+  b4: { label: '해커톤 참여자', icon: '💻', description: '해커톤 참여' },
+};
+
+const BADGE_GROUP_TITLES = [
+  '📅 캘린더 일정 (일정 등록 횟수)',
+  '💬 커뮤니티 (댓글 작성 횟수)',
+  '👍 받은 반응 (내 글이 받은 좋아요)',
+  '❤️ 반응 (좋아요 누른 횟수)',
+  '👎 반응 (싫어요 누른 횟수)',
+  '⭐ 특별 미션',
+];
+
+function displayBadge(badge) {
+  return { ...badge, ...(BADGE_TEXT[badge.id] || {}) };
+}
+
 // 유저 통계 데이터를 기반으로 획득한 뱃지 목록을 반환하는 함수
 function getEarnedBadges(stats) {
   if (!stats) return [];
@@ -360,8 +396,8 @@ export default function Profile() {
                 key={badge.id}
                 className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 shadow-sm transition-all duration-200 hover:ring-4 ${badge.style}`}
               >
-                <span className="text-xs font-extrabold">{badge.icon}</span>
-                <span className="text-xs font-extrabold">{badge.label}</span>
+                <span className="text-xs font-extrabold">{displayBadge(badge).icon}</span>
+                <span className="text-xs font-extrabold">{displayBadge(badge).label}</span>
               </div>
             ))}
             {/* 획득한 뱃지가 0개일 때 */}
@@ -459,7 +495,7 @@ export default function Profile() {
             <div className="p-4 overflow-y-auto flex flex-col bg-slate-50">
               {BADGE_GROUPS.map((group, idx) => (
                 <div key={idx} className="mb-5 last:mb-0">
-                  <p className="text-[11px] font-bold text-gray-500 mb-2.5 px-1">{group.title}</p>
+                  <p className="text-[11px] font-bold text-gray-500 mb-2.5 px-1">{BADGE_GROUP_TITLES[idx] || group.title}</p>
                   <div className="flex flex-col gap-2.5">
                     {group.badges.map((badge) => {
                       // 유저가 현재 해당 뱃지를 획득했는지 확인
@@ -473,11 +509,11 @@ export default function Profile() {
                           }`}
                         >
                           <div className={`flex items-center gap-1.5 px-3 py-1.5 border shadow-sm rounded-full shrink-0 ${badge.style}`}>
-                            <span className="text-sm">{badge.icon}</span>
-                            <span className="text-xs font-extrabold">{badge.label}</span>
+                            <span className="text-sm">{displayBadge(badge).icon}</span>
+                            <span className="text-xs font-extrabold">{displayBadge(badge).label}</span>
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-xs text-gray-700 font-medium break-keep">{badge.description}</span>
+                            <span className="text-xs text-gray-700 font-medium break-keep">{displayBadge(badge).description}</span>
                             {isEarned && <span className="text-[10px] text-primary-500 font-bold mt-0.5 tracking-tight">획득 완료!</span>}
                           </div>
                         </div>
@@ -519,6 +555,7 @@ export default function Profile() {
                 <p className="text-sm text-gray-500 text-center py-6">획득한 뱃지가 없습니다.</p>
               )}
               {getEarnedBadges(user?.stats).map(badge => {
+                const shownBadge = displayBadge(badge);
                 // '무한이' 단어 필터링
                 const badgePrefix = `${badge.icon} ${badge.label.replace('무한이', '').trim()}`;
                 return (
@@ -529,7 +566,7 @@ export default function Profile() {
                   >
                     <div className="flex items-center gap-2">
                       <span className={`px-2.5 py-1 rounded-full border text-xs font-bold shadow-sm ${badge.style}`}>
-                        {badge.icon} {badge.label}
+                        {shownBadge.icon} {shownBadge.label}
                       </span>
                     </div>
                     <p className="text-xs text-gray-500 font-medium pl-1">

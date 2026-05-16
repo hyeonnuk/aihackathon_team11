@@ -1162,11 +1162,16 @@ export default function Home() {
     );
 
     try {
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
       const response = await fetch(
         `${API_BASE_URL}/api/schedules/${currentEvent.extendedProps.scheduleId}/reactions`,
         {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(deltas),
         },
       );
@@ -1220,11 +1225,16 @@ export default function Home() {
     );
 
     try {
+      const token = localStorage.getItem('token');
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
       const response = await fetch(
         `${API_BASE_URL}/api/schedules/${currentEvent.extendedProps.scheduleId}/comments/${commentId}/reactions`,
         {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(deltas),
         },
       );

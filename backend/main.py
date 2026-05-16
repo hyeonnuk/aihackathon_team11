@@ -410,6 +410,50 @@ def init_tables() -> None:
         if cursor.fetchone() is None:
             cursor.execute("ALTER TABLE schedule_comments ADD COLUMN parent_id BIGINT UNSIGNED NULL AFTER schedule_id")
             cursor.execute("ALTER TABLE schedule_comments ADD CONSTRAINT fk_schedule_comments_parent_id FOREIGN KEY (parent_id) REFERENCES schedule_comments(id) ON DELETE CASCADE")
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schedule_reactions (
+              id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+              user_id BIGINT UNSIGNED NOT NULL,
+              schedule_id BIGINT UNSIGNED NOT NULL,
+              reaction ENUM('like', 'dislike') NOT NULL,
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+              PRIMARY KEY (id),
+              UNIQUE KEY uk_schedule_reactions_user_schedule (user_id, schedule_id),
+              INDEX idx_schedule_reactions_user_id (user_id),
+              INDEX idx_schedule_reactions_schedule_id (schedule_id),
+              CONSTRAINT fk_schedule_reactions_user_id
+                FOREIGN KEY (user_id) REFERENCES users(id)
+                ON DELETE CASCADE,
+              CONSTRAINT fk_schedule_reactions_schedule_id
+                FOREIGN KEY (schedule_id) REFERENCES schedules(id)
+                ON DELETE CASCADE
+            )
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS comment_reactions (
+              id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+              user_id BIGINT UNSIGNED NOT NULL,
+              comment_id BIGINT UNSIGNED NOT NULL,
+              reaction ENUM('like', 'dislike') NOT NULL,
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+              PRIMARY KEY (id),
+              UNIQUE KEY uk_comment_reactions_user_comment (user_id, comment_id),
+              INDEX idx_comment_reactions_user_id (user_id),
+              INDEX idx_comment_reactions_comment_id (comment_id),
+              CONSTRAINT fk_comment_reactions_user_id
+                FOREIGN KEY (user_id) REFERENCES users(id)
+                ON DELETE CASCADE,
+              CONSTRAINT fk_comment_reactions_comment_id
+                FOREIGN KEY (comment_id) REFERENCES schedule_comments(id)
+                ON DELETE CASCADE
+            )
+            """
+        )
             
         connection.commit()
     finally:
@@ -568,6 +612,43 @@ def require_schedule_manager(current_user: dict, schedule_author: str | None) ->
         )
 
 
+def get_reaction_from_delta(payload: ScheduleReactionRequest) -> str | None:
+    if payload.likeDelta > 0:
+        return "like"
+    if payload.dislikeDelta > 0:
+        return "dislike"
+    return None
+
+
+def sync_user_reaction(
+    cursor,
+    table: str,
+    target_column: str,
+    user_id: int | None,
+    target_id: int,
+    payload: ScheduleReactionRequest,
+) -> None:
+    if user_id is None:
+        return
+
+    next_reaction = get_reaction_from_delta(payload)
+    if next_reaction:
+        cursor.execute(
+            f"""
+            INSERT INTO {table} (user_id, {target_column}, reaction)
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE reaction = VALUES(reaction)
+            """,
+            (user_id, target_id, next_reaction),
+        )
+        return
+
+    cursor.execute(
+        f"DELETE FROM {table} WHERE user_id = %s AND {target_column} = %s",
+        (user_id, target_id),
+    )
+
+
 def serialize_datetime(value):
     return value.isoformat(sep=" ") if value else None
 
@@ -694,14 +775,15 @@ def load_user_activity(cursor, user_id: int) -> tuple[dict, list[dict], list[dic
         )
 
     author_names = (user["name"], user["login_id"])
+    author_name_pattern = f"% {user['name']}"
     cursor.execute(
         """
         SELECT id, title, start_date, end_date, content, like_count, dislike_count, created_at
         FROM schedules
-        WHERE author IN (%s, %s)
+        WHERE author IN (%s, %s) OR author LIKE %s
         ORDER BY created_at DESC, id DESC
         """,
-        author_names,
+        (*author_names, author_name_pattern),
     )
     posts = [to_user_post_response(post) for post in cursor.fetchall()]
 
@@ -711,22 +793,76 @@ def load_user_activity(cursor, user_id: int) -> tuple[dict, list[dict], list[dic
                c.created_at, s.title AS schedule_title
         FROM schedule_comments c
         JOIN schedules s ON s.id = c.schedule_id
-        WHERE c.author IN (%s, %s)
+        WHERE c.author IN (%s, %s) OR c.author LIKE %s
         ORDER BY c.created_at DESC, c.id DESC
         """,
-        author_names,
+        (*author_names, author_name_pattern),
     )
     comments = [to_user_comment_response(comment) for comment in cursor.fetchall()]
+
+    cursor.execute(
+        """
+        SELECT
+          (SELECT COUNT(*) FROM schedule_reactions WHERE user_id = %s AND reaction = 'like') +
+          (SELECT COUNT(*) FROM comment_reactions WHERE user_id = %s AND reaction = 'like') AS likes_count,
+          (SELECT COUNT(*) FROM schedule_reactions WHERE user_id = %s AND reaction = 'dislike') +
+          (SELECT COUNT(*) FROM comment_reactions WHERE user_id = %s AND reaction = 'dislike') AS dislikes_count
+        """,
+        (user_id, user_id, user_id, user_id),
+    )
+    reaction_stats = cursor.fetchone() or {"likes_count": 0, "dislikes_count": 0}
+
+    cursor.execute(
+        """
+        SELECT 1
+        FROM schedule_comments c
+        WHERE (c.author IN (%s, %s) OR c.author LIKE %s)
+          AND c.id = (
+            SELECT c2.id
+            FROM schedule_comments c2
+            WHERE c2.schedule_id = c.schedule_id
+            ORDER BY c2.created_at ASC, c2.id ASC
+            LIMIT 1
+          )
+        LIMIT 1
+        """,
+        (*author_names, author_name_pattern),
+    )
+    is_first_commenter = cursor.fetchone() is not None
+
+    cursor.execute(
+        """
+        SELECT 1
+        FROM schedules s
+        WHERE (
+            LOWER(s.title) LIKE '%hackathon%' OR s.title LIKE '%해커톤%'
+            OR LOWER(COALESCE(s.hashtag, '')) LIKE '%hackathon%' OR COALESCE(s.hashtag, '') LIKE '%해커톤%'
+            OR LOWER(COALESCE(s.content, '')) LIKE '%hackathon%' OR COALESCE(s.content, '') LIKE '%해커톤%'
+          )
+          AND (
+            s.author IN (%s, %s) OR s.author LIKE %s
+            OR EXISTS (
+              SELECT 1
+              FROM schedule_comments c
+              WHERE c.schedule_id = s.id
+                AND (c.author IN (%s, %s) OR c.author LIKE %s)
+            )
+          )
+        LIMIT 1
+        """,
+        (*author_names, author_name_pattern, *author_names, author_name_pattern),
+    )
+    has_joined_hackathon = cursor.fetchone() is not None
 
     stats = {
         "scheduleCount": len(posts),
         "commentCount": len(comments),
         "receivedLikesCount": sum(post["likeCount"] for post in posts),
         "receivedDislikesCount": sum(post["dislikeCount"] for post in posts),
-        "likesCount": 0,
-        "dislikesCount": 0,
-        "hasJoinedHackathon": any("hackathon" in (post["title"] or "").lower() or "해커톤" in (post["title"] or "") for post in posts),
-        "isFirstCommenter": False,
+        "likesCount": reaction_stats["likes_count"] or 0,
+        "dislikesCount": reaction_stats["dislikes_count"] or 0,
+        "hasJoinedHackathon": has_joined_hackathon,
+        "isFirstCommenter": is_first_commenter,
     }
     return user, posts, comments, stats
 
@@ -1329,7 +1465,12 @@ def get_schedule(schedule_id: int):
 
 
 @app.patch("/api/schedules/{schedule_id}/reactions")
-def update_schedule_reactions(schedule_id: int, payload: ScheduleReactionRequest):
+def update_schedule_reactions(
+    schedule_id: int,
+    payload: ScheduleReactionRequest,
+    authorization: str | None = Header(default=None),
+):
+    current_user = load_user_from_authorization(authorization, required=False)
     try:
         connection = get_connection()
         cursor = connection.cursor(dictionary=True)
@@ -1349,6 +1490,14 @@ def update_schedule_reactions(schedule_id: int, payload: ScheduleReactionRequest
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Schedule not found.",
                 )
+            sync_user_reaction(
+                cursor,
+                "schedule_reactions",
+                "schedule_id",
+                current_user["id"] if current_user else None,
+                schedule_id,
+                payload,
+            )
             connection.commit()
 
             cursor.execute(
@@ -1534,7 +1683,9 @@ def update_schedule_comment_reactions(
     schedule_id: int,
     comment_id: int,
     payload: ScheduleReactionRequest,
+    authorization: str | None = Header(default=None),
 ):
+    current_user = load_user_from_authorization(authorization, required=False)
     try:
         connection = get_connection()
         cursor = connection.cursor(dictionary=True)
@@ -1554,6 +1705,14 @@ def update_schedule_comment_reactions(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Schedule comment not found.",
                 )
+            sync_user_reaction(
+                cursor,
+                "comment_reactions",
+                "comment_id",
+                current_user["id"] if current_user else None,
+                comment_id,
+                payload,
+            )
             connection.commit()
 
             cursor.execute(
