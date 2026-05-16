@@ -203,10 +203,18 @@ function CommentCard({
       {/* 댓글 헤더 */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center shrink-0">
-            <span className="text-[10px] font-bold text-primary-500">
-              {comment.author ? comment.author.charAt(0) : '?'}
-            </span>
+          <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center shrink-0 overflow-hidden">
+            {comment.authorProfileImage ? (
+              <img
+                src={comment.authorProfileImage}
+                alt={`${comment.author || 'user'} profile`}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <span className="text-[10px] font-bold text-primary-500">
+                {comment.author ? comment.author.charAt(0) : '?'}
+              </span>
+            )}
           </div>
           <span className="text-xs font-semibold text-gray-700">{comment.author}</span>
         </div>
@@ -271,8 +279,12 @@ function CommentCard({
 
       {isReplying && (
         <div className="pl-8 mt-3 flex gap-2 items-start">
-          <div className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center shrink-0 mt-1">
-             <span className="text-[8px] font-bold text-indigo-600">{user.name.charAt(0)}</span>
+          <div className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center shrink-0 mt-1 overflow-hidden">
+            {user.profileImage ? (
+              <img src={user.profileImage} alt="내 프로필" className="h-full w-full object-cover" />
+            ) : (
+              <span className="text-[8px] font-bold text-indigo-600">{user.name.charAt(0)}</span>
+            )}
           </div>
           <div className="flex-1 flex flex-col gap-2">
             <textarea
@@ -655,8 +667,12 @@ export default function EventDetailPanel({
             {/* 댓글 입력 */}
             {user ? (
               <div className="flex items-center gap-2 mb-5">
-                <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center shrink-0">
-                  <span className="text-[10px] font-bold text-primary-500">{user.name.charAt(0)}</span>
+                <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center shrink-0 overflow-hidden">
+                  {user.profileImage ? (
+                    <img src={user.profileImage} alt="내 프로필" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-[10px] font-bold text-primary-500">{user.name.charAt(0)}</span>
+                  )}
                 </div>
                 <input
                   type="text"

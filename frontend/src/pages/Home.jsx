@@ -243,6 +243,7 @@ function scheduleCommentToView(comment) {
     parentId: comment.parentId ?? comment.parent_id ?? null,
     author: comment.author,
     authorId: comment.authorId ?? comment.author_id ?? null,
+    authorProfileImage: comment.authorProfileImage ?? comment.author_profile_image ?? null,
     content: comment.content,
     createdAt: comment.createdAt,
     likes: comment.likes ?? 0,

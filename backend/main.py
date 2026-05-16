@@ -578,6 +578,7 @@ def to_comment_response(row: dict) -> dict:
         "scheduleId": row["schedule_id"],
         "parentId": row.get("parent_id"),
         "author": row["author"],
+        "authorProfileImage": row.get("author_profile_image"),
         "content": row["content"],
         "likes": row["like_count"],
         "dislikes": row["dislike_count"],
@@ -592,10 +593,16 @@ def fetch_comments_by_schedule_ids(cursor, schedule_ids: list[int]) -> dict[int,
     placeholders = ", ".join(["%s"] * len(schedule_ids))
     cursor.execute(
         f"""
-        SELECT id, schedule_id, parent_id, author, content, like_count, dislike_count, created_at
-        FROM schedule_comments
-        WHERE schedule_id IN ({placeholders})
-        ORDER BY created_at ASC, id ASC
+        SELECT c.id, c.schedule_id, c.parent_id, c.author, c.content,
+               c.like_count, c.dislike_count, c.created_at,
+               u.profile_image AS author_profile_image
+        FROM schedule_comments c
+        LEFT JOIN users u
+          ON c.author = u.name
+          OR c.author = u.login_id
+          OR c.author LIKE CONCAT('% ', u.name)
+        WHERE c.schedule_id IN ({placeholders})
+        ORDER BY c.created_at ASC, c.id ASC
         """,
         schedule_ids,
     )
@@ -1077,10 +1084,16 @@ def list_schedule_comments_for_test(schedule_id: int):
 
             cursor.execute(
                 """
-                SELECT id, schedule_id, parent_id, author, content, like_count, dislike_count, created_at
-                FROM schedule_comments
-                WHERE schedule_id = %s
-                ORDER BY created_at ASC, id ASC
+                SELECT c.id, c.schedule_id, c.parent_id, c.author, c.content,
+                       c.like_count, c.dislike_count, c.created_at,
+                       u.profile_image AS author_profile_image
+                FROM schedule_comments c
+                LEFT JOIN users u
+                  ON c.author = u.name
+                  OR c.author = u.login_id
+                  OR c.author LIKE CONCAT('% ', u.name)
+                WHERE c.schedule_id = %s
+                ORDER BY c.created_at ASC, c.id ASC
                 """,
                 (schedule_id,),
             )
@@ -1393,10 +1406,15 @@ def create_schedule_comment(schedule_id: int, payload: CommentCreateRequest):
 
             cursor.execute(
                 """
-                SELECT id, schedule_id, parent_id, author, content,
-                       like_count, dislike_count, created_at
-                FROM schedule_comments
-                WHERE id = %s
+                SELECT c.id, c.schedule_id, c.parent_id, c.author, c.content,
+                       c.like_count, c.dislike_count, c.created_at,
+                       u.profile_image AS author_profile_image
+                FROM schedule_comments c
+                LEFT JOIN users u
+                  ON c.author = u.name
+                  OR c.author = u.login_id
+                  OR c.author LIKE CONCAT('% ', u.name)
+                WHERE c.id = %s
                 LIMIT 1
                 """,
                 (comment_id,),
@@ -1446,10 +1464,15 @@ def update_schedule_comment(
 
             cursor.execute(
                 """
-                SELECT id, schedule_id, parent_id, author, content,
-                       like_count, dislike_count, created_at
-                FROM schedule_comments
-                WHERE id = %s AND schedule_id = %s
+                SELECT c.id, c.schedule_id, c.parent_id, c.author, c.content,
+                       c.like_count, c.dislike_count, c.created_at,
+                       u.profile_image AS author_profile_image
+                FROM schedule_comments c
+                LEFT JOIN users u
+                  ON c.author = u.name
+                  OR c.author = u.login_id
+                  OR c.author LIKE CONCAT('% ', u.name)
+                WHERE c.id = %s AND c.schedule_id = %s
                 LIMIT 1
                 """,
                 (comment_id, schedule_id),
