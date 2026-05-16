@@ -342,9 +342,12 @@ export default function EventDetailPanel({
   const ep = event.extendedProps;
   const [localComments, setLocalComments] = useState(ep.comments || []);
   useEffect(() => {
-    setCommentText('');
     setLocalComments(ep.comments || []);
-  }, [event.id, ep.comments]);
+  }, [ep.comments]);
+
+  useEffect(() => {
+    setCommentText('');
+  }, [event.id]);
 
   // 하위 컴포넌트 이벤트 래핑(Intercept) : 부모의 로컬 상태(저장소)를 업데이트하기 위함
   const handleInterceptEditComment = (id, content) => {

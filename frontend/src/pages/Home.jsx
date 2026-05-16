@@ -9,6 +9,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const SCHEDULE_SYNC_INTERVAL_MS = 5000;
 
 const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
 const ALL_GRADES = ['1학년', '2학년', '3학년', '4학년'];
@@ -195,6 +196,21 @@ function gradeToLabels(grade) {
   return [`${grade}학년`];
 }
 
+function scheduleCommentToView(comment) {
+  return {
+    id: comment.id,
+    parentId: comment.parentId ?? comment.parent_id ?? null,
+    author: comment.author,
+    authorId: comment.authorId ?? comment.author_id ?? null,
+    content: comment.content,
+    createdAt: comment.createdAt,
+    likes: comment.likes ?? 0,
+    dislikes: comment.dislikes ?? 0,
+    userReaction: null,
+    replies: (comment.replies || []).map((reply) => scheduleCommentToView(reply)),
+  };
+}
+
 function scheduleToEvent(schedule) {
   const tags = parseTags(schedule.hashtag);
   const color = schedule.notice ? NOTICE_COLOR : getTagColor(tags);
@@ -228,17 +244,45 @@ function scheduleToEvent(schedule) {
       likes: schedule.likeCount ?? 0,
       dislikes: schedule.dislikeCount ?? 0,
       userReaction: null,
-      comments: (schedule.comments || []).map((comment) => ({
-        id: comment.id,
-        author: comment.author,
-        content: comment.content,
-        createdAt: comment.createdAt,
-        likes: comment.likes ?? 0,
-        dislikes: comment.dislikes ?? 0,
-        userReaction: null,
-      })),
+      comments: (schedule.comments || []).map((comment) => scheduleCommentToView(comment)),
     },
   };
+}
+
+function mergeSyncedComments(previousComments = [], nextComments = []) {
+  const previousById = new Map(previousComments.map((comment) => [String(comment.id), comment]));
+
+  return nextComments.map((comment) => {
+    const previous = previousById.get(String(comment.id));
+    if (!previous) return comment;
+
+    return {
+      ...comment,
+      userReaction: previous.userReaction ?? comment.userReaction ?? null,
+      replies: mergeSyncedComments(previous.replies || [], comment.replies || []),
+    };
+  });
+}
+
+function mergeSyncedEvents(previousEvents, nextEvents) {
+  const previousById = new Map(previousEvents.map((event) => [event.id, event]));
+
+  return nextEvents.map((event) => {
+    const previous = previousById.get(event.id);
+    if (!previous) return event;
+
+    return {
+      ...event,
+      extendedProps: {
+        ...event.extendedProps,
+        userReaction: previous.extendedProps?.userReaction ?? event.extendedProps.userReaction,
+        comments: mergeSyncedComments(
+          previous.extendedProps?.comments || [],
+          event.extendedProps.comments || [],
+        ),
+      },
+    };
+  });
 }
 
 function getFilteredEvents(events, selectedGrades, selectedTags, showNoticeOnly) {
@@ -720,8 +764,9 @@ export default function Home() {
 
   const hasActiveFilters = selectedGrades.length > 0 || selectedTags.length > 0 || showNoticeOnly;
 
-  const loadSchedules = async () => {
-    setScheduleError('');
+  const loadSchedules = async (options = {}) => {
+    const silent = options?.silent === true;
+    if (!silent) setScheduleError('');
     try {
       const response = await fetch(`${API_BASE_URL}/api/schedules`);
       const data = await response.json().catch(() => ({}));
@@ -730,15 +775,37 @@ export default function Home() {
         throw new Error(data.detail || data.message || '일정을 불러오지 못했습니다.');
       }
 
-      setEvents((data.schedules || []).map((schedule) => scheduleToEvent(schedule)));
+      const nextEvents = (data.schedules || []).map((schedule) => scheduleToEvent(schedule));
+      setScheduleError('');
+      setEvents((previousEvents) => mergeSyncedEvents(previousEvents, nextEvents));
     } catch (error) {
-      setScheduleError(error.message);
-      setEvents([]);
+      if (!silent) {
+        setScheduleError(error.message);
+        setEvents([]);
+      }
     }
   };
 
   useEffect(() => {
     loadSchedules();
+  }, []);
+
+  useEffect(() => {
+    const syncSchedules = () => {
+      if (document.visibilityState === 'visible') {
+        loadSchedules({ silent: true });
+      }
+    };
+
+    const intervalId = window.setInterval(syncSchedules, SCHEDULE_SYNC_INTERVAL_MS);
+    window.addEventListener('focus', syncSchedules);
+    document.addEventListener('visibilitychange', syncSchedules);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', syncSchedules);
+      document.removeEventListener('visibilitychange', syncSchedules);
+    };
   }, []);
 
   useEffect(() => {
@@ -997,7 +1064,7 @@ export default function Home() {
         throw new Error(data.detail || data.message || '댓글을 저장하지 못했습니다.');
       }
 
-      await loadSchedules();
+      await loadSchedules({ silent: true });
     } catch (error) {
       alert(error.message);
     }
