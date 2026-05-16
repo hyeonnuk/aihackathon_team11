@@ -811,10 +811,11 @@ export default function Home() {
       console.error(e);
     }
     const memoEvents = localMemos.map(memo => {
+      const base = { ...memo, backgroundColor: '#fccb86', borderColor: '#fccb86', textColor: '#635746' };
       if (memo.allDay && memo.end) {
-        return { ...memo, end: addOneDay(memo.end) };
+        return { ...base, end: addOneDay(memo.end) };
       }
-      return memo;
+      return base;
     });
 
     try {
@@ -1223,7 +1224,7 @@ export default function Home() {
               {user.role === 'master' && (
                 <button
                   onClick={() => navigate('/admin/users')}
-                  className="rounded-lg border border-primary-200 bg-white px-3 py-1.5 text-sm font-semibold text-primary-600 transition-all hover:bg-primary-50 active:scale-95"
+                  className="flex items-center rounded-lg border border-primary-200 bg-white px-4 py-2 text-sm font-semibold text-primary-600 transition-all hover:bg-primary-50 active:scale-95"
                 >
                   권한 관리
                 </button>

@@ -29,7 +29,7 @@
 }
 
 .fc .fc-button:focus {
-  box-shadow: 0 0 0 3px #c3d3ff !important;
+  box-shadow: none !important;
   outline: none !important;
 }
 
@@ -172,6 +172,42 @@
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+/* 화살표 < > 패딩 및 간격 */
+.fc .fc-prev-button,
+.fc .fc-next-button {
+  padding-left: calc(0.9rem - 6px) !important;
+  padding-right: calc(0.9rem - 6px) !important;
+}
+
+.fc .fc-prev-button {
+  margin-right: 8px !important;
+}
+
+/* 월별/주별 버튼 — 하나의 박스, 중간 구분선 */
+.fc .fc-toolbar-chunk:last-child > .fc-button-group > .fc-button {
+  border-radius: 0 !important;
+  border-right: none !important;
+}
+
+.fc .fc-toolbar-chunk:last-child > .fc-button-group > .fc-button:first-child {
+  border-top-left-radius: 8px !important;
+  border-bottom-left-radius: 8px !important;
+}
+
+.fc .fc-toolbar-chunk:last-child > .fc-button-group > .fc-button:last-child {
+  border-top-right-radius: 8px !important;
+  border-bottom-right-radius: 8px !important;
+  border-right: 1px solid #D3D6DE !important;
+}
+
+.fc .fc-toolbar-chunk:last-child > .fc-button-group > .fc-button + .fc-button {
+  border-left: none !important;
+}
+
+.fc .fc-toolbar-chunk:last-child > .fc-button-group > .fc-button:first-child {
+  border-right: 1px solid #D3D6DE !important;
 }
 
 /* More 링크 */
