@@ -33,14 +33,14 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-blue-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary-500 via-white to-blue-50 flex items-center justify-center p-4">
 
       {/* ── 로그인 카드 ───────────────────────────────────── */}
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 animate-fade-in">
 
         {/* 로고 */}
         <div className="flex items-center justify-center gap-2.5 mb-8">
-          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-md">
+          <div className="w-10 h-10 bg-primary-500 rounded-xl flex items-center justify-center shadow-md">
             <span className="text-white font-extrabold text-base tracking-tight">C</span>
           </div>
           <span className="text-2xl font-extrabold text-gray-800 tracking-tight">COM:HUB</span>
@@ -63,7 +63,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="example@cs.ac.kr"
-              className="px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition"
+              className="px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent transition"
             />
           </div>
 
@@ -71,21 +71,21 @@ export default function LoginPage() {
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
               <label className="text-xs font-semibold text-gray-600">비밀번호</label>
-              <span className="text-xs text-indigo-500 cursor-pointer hover:underline">비밀번호 찾기</span>
+              <span className="text-xs text-primary-500 cursor-pointer hover:underline">비밀번호 찾기</span>
             </div>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition"
+              className="px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent transition"
             />
           </div>
 
           {/* 로그인 버튼 */}
           <button
             type="submit"
-            className="mt-2 w-full py-3 bg-indigo-600 text-white text-sm font-bold rounded-xl hover:bg-indigo-700 active:scale-[0.98] transition-all shadow-sm"
+            className="mt-2 w-full py-3 bg-primary-500 text-white text-sm font-bold rounded-xl hover:bg-primary-600 active:scale-[0.98] transition-all shadow-sm"
           >
             로그인
           </button>
@@ -110,7 +110,7 @@ export default function LoginPage() {
         {/* 회원가입 안내 */}
         <p className="text-xs text-gray-400 text-center mt-7">
           아직 계정이 없으신가요?{' '}
-          <span className="text-indigo-600 font-semibold cursor-pointer hover:underline">
+          <span className="text-primary-500 font-semibold cursor-pointer hover:underline">
             회원가입
           </span>
         </p>

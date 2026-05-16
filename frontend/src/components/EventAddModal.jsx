@@ -4,7 +4,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 const INPUT =
   'w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-800 ' +
-  'placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-400 ' +
+  'placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-400 ' +
   'focus:border-transparent transition';
 
 const GRADES = [
@@ -180,7 +180,7 @@ export default function EventAddModal({ isOpen, onClose, onCreated, initialData 
       >
         <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-6 py-4">
           <div>
-            <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-1">
+            <p className="text-[10px] font-bold text-primary-500 uppercase tracking-widest mb-1">
               {mode === 'edit' ? '일정 수정' : '새 일정'}
             </p>
             <h2 className="text-lg font-extrabold text-gray-800 leading-tight">
@@ -244,7 +244,7 @@ export default function EventAddModal({ isOpen, onClose, onCreated, initialData 
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="사진">
-                <label className="flex cursor-pointer select-none items-center gap-2 rounded-xl border border-dashed border-gray-300 px-4 py-3 text-sm transition-colors hover:border-indigo-400 hover:bg-indigo-50">
+                <label className="flex cursor-pointer select-none items-center gap-2 rounded-xl border border-dashed border-gray-300 px-4 py-3 text-sm transition-colors hover:border-primary-400 hover:bg-primary-50">
                   <span className="text-gray-500 truncate">
                     {form.photo
                       ? typeof form.photo === 'string' ? '기존 이미지' : form.photo.name
@@ -303,7 +303,7 @@ export default function EventAddModal({ isOpen, onClose, onCreated, initialData 
                         setForm((prev) => ({ ...prev, notice: event.target.checked }))
                       }
                     />
-                    <div className="h-6 w-10 rounded-full bg-gray-200 transition-colors duration-200 peer-checked:bg-indigo-600" />
+                    <div className="h-6 w-10 rounded-full bg-gray-200 transition-colors duration-200 peer-checked:bg-primary-500" />
                     <div className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-4" />
                   </div>
                   <span className="text-sm text-gray-600">
@@ -331,8 +331,8 @@ export default function EventAddModal({ isOpen, onClose, onCreated, initialData 
                       }
                       className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-all active:scale-95 ${
                         isSelected
-                          ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
-                          : 'border-gray-300 bg-white text-gray-600 hover:border-indigo-400 hover:text-indigo-600'
+                          ? 'border-primary-500 bg-primary-500 text-white shadow-sm'
+                          : 'border-gray-300 bg-white text-gray-600 hover:border-primary-400 hover:text-primary-500'
                       }`}
                     >
                       {tag}
@@ -374,7 +374,7 @@ export default function EventAddModal({ isOpen, onClose, onCreated, initialData 
             type="submit"
             form="event-add-form"
             disabled={isSubmitting}
-            className="rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-indigo-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-indigo-300"
+            className="rounded-xl bg-primary-500 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-primary-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-primary-300"
           >
             {isSubmitting
               ? (mode === 'edit' ? '수정 중...' : '등록 중...')
