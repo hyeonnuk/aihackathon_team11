@@ -257,6 +257,43 @@ function getDeadlineBadge(applyEndDate) {
   return null;
 }
 
+function buildEditInitialData(event) {
+  const ep = event.extendedProps;
+
+  let gradeValue = 'all';
+  if (ep.grade && ep.grade.length > 0 && ep.grade.length < ALL_GRADES.length) {
+    gradeValue = ep.grade[0].replace('학년', '');
+  }
+
+  let endDateStr = '';
+  if (event.end) {
+    const d = new Date(`${event.end}T00:00:00`);
+    d.setDate(d.getDate() - 1);
+    endDateStr = [
+      d.getFullYear(),
+      String(d.getMonth() + 1).padStart(2, '0'),
+      String(d.getDate()).padStart(2, '0'),
+    ].join('-');
+  }
+
+  const title = event.title.replace(/^\[공지\] /, '');
+
+  return {
+    scheduleId: ep.scheduleId,
+    title,
+    startDate: event.start ? `${event.start}T00:00` : '',
+    endDate: endDateStr ? `${endDateStr}T00:00` : '',
+    content: ep.description || '',
+    photo: ep.photo || null,
+    link: ep.applyLink || '',
+    note: ep.note || '',
+    grade: gradeValue,
+    notice: Boolean(ep.notice),
+    hashtags: ep.tags || [],
+    author: ep.author || '',
+  };
+}
+
 function getReactionUpdate(currentProps, reaction) {
   const nextProps = { ...currentProps };
   const deltas = { likeDelta: 0, dislikeDelta: 0 };
@@ -453,6 +490,8 @@ export default function Home() {
   const [scheduleError, setScheduleError] = useState('');
   const [panelView, setPanelView] = useState('list');
   const [detailEventId, setDetailEventId] = useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editTargetEvent, setEditTargetEvent] = useState(null);
 
   const hasActiveFilters = selectedGrades.length > 0 || selectedTags.length > 0;
 
@@ -529,6 +568,13 @@ export default function Home() {
   const handleBackToList = () => {
     setPanelView('list');
     setDetailEventId(null);
+  };
+
+  const handleOpenEdit = (eventId) => {
+    const event = events.find((e) => e.id === eventId);
+    if (!event) return;
+    setEditTargetEvent(event);
+    setIsEditModalOpen(true);
   };
 
   const handleEventReaction = async (eventId, reaction) => {
@@ -778,6 +824,7 @@ export default function Home() {
                 handleCommentReaction(detailEventId, commentId, reaction)
               }
               onAddComment={(content) => handleAddComment(detailEventId, content)}
+              onEdit={user ? () => handleOpenEdit(detailEventId) : undefined}
               user={user}
             />
           ) : null}
@@ -788,6 +835,15 @@ export default function Home() {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onCreated={loadSchedules}
+      />
+
+      <EventAddModal
+        key={editTargetEvent?.id ?? 'edit-modal'}
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onCreated={() => { loadSchedules(); setIsEditModalOpen(false); }}
+        mode="edit"
+        initialData={editTargetEvent ? buildEditInitialData(editTargetEvent) : null}
       />
     </div>
   );

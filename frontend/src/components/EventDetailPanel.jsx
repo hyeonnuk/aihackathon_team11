@@ -110,6 +110,7 @@ export default function EventDetailPanel({
   onReact,
   onCommentReact,
   onAddComment,
+  onEdit,
   user,
 }) {
   const [commentText, setCommentText] = useState('');
@@ -129,19 +130,32 @@ export default function EventDetailPanel({
 
       {/* ── 고정 헤더 ──────────────────────────────────────── */}
       <div className="px-6 pt-5 pb-4 border-b border-gray-200 bg-gray-50 shrink-0">
-        {/* 뒤로가기 버튼 */}
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1.5 text-xs font-semibold text-indigo-500 hover:text-indigo-700 transition-colors mb-3 group"
-        >
-          <svg
-            className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform"
-            fill="none" viewBox="0 0 24 24" stroke="currentColor"
+        {/* 뒤로가기 + 수정 버튼 */}
+        <div className="flex items-center justify-between mb-3">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 text-xs font-semibold text-indigo-500 hover:text-indigo-700 transition-colors group"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
-          </svg>
-          일정 목록으로
-        </button>
+            <svg
+              className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+            </svg>
+            일정 목록으로
+          </button>
+          {onEdit && (
+            <button
+              onClick={onEdit}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              수정
+            </button>
+          )}
+        </div>
 
         {/* 제목 + 뱃지 */}
         <div className="flex items-start gap-3">
