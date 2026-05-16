@@ -1,10 +1,3 @@
-// ============================================================
-//  pages/Home.jsx — 경로: /
-//  개인화 캘린더 대시보드
-//  좌측(70%): FullCalendar — dateClick + eventClick + 학년/태그 필터
-//  우측(30%): Daily Agenda — 선택된 날짜의 일정 필터링 & 카드 표시
-// ============================================================
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../App.css';
@@ -13,7 +6,6 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 
-// ── 오늘 날짜를 "YYYY-MM-DD" 문자열로 반환 ──────────────────
 function getTodayStr() {
   const now = new Date();
   return [
@@ -23,7 +15,6 @@ function getTodayStr() {
   ].join('-');
 }
 
-// ── "YYYY-MM-DD" → "X월 XX일 (요일)" 형태로 변환 ─────────
 const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
 function formatDateLabel(dateStr) {
   const [year, month, day] = dateStr.split('-').map(Number);
@@ -31,21 +22,17 @@ function formatDateLabel(dateStr) {
   return `${month}월 ${day}일 (${DAY_NAMES[d.getDay()]})`;
 }
 
-// ── 필터 상수 ──────────────────────────────────────────────
 const ALL_GRADES = ['1학년', '2학년', '3학년', '4학년'];
 const ALL_TAGS   = ['공모전', '해커톤', '스터디', '프로젝트', '장학/취업'];
 
-// ── 더미 이벤트 데이터 ──────────────────────────────────────
-// extendedProps.grade : 대상 학년 배열 (필터용)
-// extendedProps.tags  : 카테고리 태그 배열 (필터 + 해시태그 표시 겸용)
 const EVENTS = [
   {
     id: '1',
     title: '교내 웹 해커톤',
     start: '2026-05-20',
-    end: '2026-05-23',          // 실제 기간: 20 ~ 22일 (end exclusive)
-    backgroundColor: '#6366f1',
-    borderColor: '#6366f1',
+    end: '2026-05-23',
+    backgroundColor: '#818cf8',
+    borderColor: '#818cf8',
     extendedProps: {
       grade: ['2학년', '3학년', '4학년'],
       tags: ['해커톤', '프로젝트'],
@@ -56,9 +43,9 @@ const EVENTS = [
     id: '2',
     title: '기말 프로젝트 발표',
     start: '2026-05-25',
-    end: '2026-05-27',          // 실제 기간: 25 ~ 26일
-    backgroundColor: '#f43f5e',
-    borderColor: '#f43f5e',
+    end: '2026-05-27',
+    backgroundColor: '#fb7185',
+    borderColor: '#fb7185',
     extendedProps: {
       grade: ['1학년', '2학년', '3학년', '4학년'],
       tags: ['프로젝트'],
@@ -69,8 +56,8 @@ const EVENTS = [
     id: '3',
     title: '카카오 코딩테스트',
     start: '2026-05-28',
-    backgroundColor: '#f59e0b',
-    borderColor: '#f59e0b',
+    backgroundColor: '#fbbf24',
+    borderColor: '#fbbf24',
     extendedProps: {
       grade: ['3학년', '4학년'],
       tags: ['장학/취업'],
@@ -81,8 +68,8 @@ const EVENTS = [
     id: '4',
     title: '알고리즘 스터디',
     start: '2026-06-03',
-    backgroundColor: '#10b981',
-    borderColor: '#10b981',
+    backgroundColor: '#34d399',
+    borderColor: '#34d399',
     extendedProps: {
       grade: ['1학년', '2학년', '3학년', '4학년'],
       tags: ['스터디'],
@@ -93,9 +80,9 @@ const EVENTS = [
     id: '5',
     title: 'Google ML Bootcamp',
     start: '2026-06-05',
-    end: '2026-06-08',          // 실제 기간: 5 ~ 7일
-    backgroundColor: '#3b82f6',
-    borderColor: '#3b82f6',
+    end: '2026-06-08',
+    backgroundColor: '#60a5fa',
+    borderColor: '#60a5fa',
     extendedProps: {
       grade: ['2학년', '3학년', '4학년'],
       tags: ['공모전', '프로젝트'],
@@ -106,8 +93,8 @@ const EVENTS = [
     id: '6',
     title: '장학금 신청 마감',
     start: '2026-05-31',
-    backgroundColor: '#8b5cf6',
-    borderColor: '#8b5cf6',
+    backgroundColor: '#a78bfa',
+    borderColor: '#a78bfa',
     extendedProps: {
       grade: ['1학년', '2학년', '3학년', '4학년'],
       tags: ['장학/취업'],
@@ -118,8 +105,8 @@ const EVENTS = [
     id: '7',
     title: '앱 공모전 접수 마감',
     start: '2026-06-10',
-    backgroundColor: '#ec4899',
-    borderColor: '#ec4899',
+    backgroundColor: '#f472b6',
+    borderColor: '#f472b6',
     extendedProps: {
       grade: ['1학년', '2학년', '3학년'],
       tags: ['공모전'],
@@ -128,8 +115,6 @@ const EVENTS = [
   },
 ];
 
-// ── 필터 로직 ──────────────────────────────────────────────
-// 학년(OR) AND 태그(OR), 둘 다 비어있으면 전체 표시
 function getFilteredEvents(selectedGrades, selectedTags) {
   if (selectedGrades.length === 0 && selectedTags.length === 0) return EVENTS;
   return EVENTS.filter(({ extendedProps: { grade, tags } }) => {
@@ -139,9 +124,6 @@ function getFilteredEvents(selectedGrades, selectedTags) {
   });
 }
 
-// ── 날짜에 해당하는 이벤트 필터링 ──────────────────────────
-// end가 있는 경우: start <= date < end (end exclusive 적용)
-// end가 없는 경우: start === date (단일 일정)
 function getEventsForDate(events, dateStr) {
   return events.filter((ev) =>
     ev.end
@@ -150,7 +132,6 @@ function getEventsForDate(events, dateStr) {
   );
 }
 
-// ── localStorage 헬퍼 ────────────────────────────────────────
 function getStoredUser() {
   try {
     const raw = localStorage.getItem('user');
@@ -160,36 +141,22 @@ function getStoredUser() {
   }
 }
 
-// ── AgendaCard: 우측 패널 일정 카드 ────────────────────────
+// ── AgendaCard ──────────────────────────────────────────────
 function AgendaCard({ event, isLast }) {
   const { description, tags } = event.extendedProps;
-
   return (
     <div>
       <div className="py-4 flex gap-3 items-stretch">
-        {/* 좌측 이벤트 색상 인디케이터 바 */}
-        <div
-          className="w-1 rounded-full shrink-0"
-          style={{ backgroundColor: event.backgroundColor }}
-        />
-
+        <div className="w-1 rounded-full shrink-0" style={{ backgroundColor: event.backgroundColor }} />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-gray-800 leading-snug">
-            {event.title}
-          </p>
-          <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-            {description}
-          </p>
-          {/* 해시태그 뱃지 (이벤트 색상 기반 반투명 배경) */}
+          <p className="text-sm font-semibold text-gray-800 leading-snug">{event.title}</p>
+          <p className="text-xs text-gray-400 mt-1 leading-relaxed">{description}</p>
           <div className="flex flex-wrap gap-1.5 mt-2.5">
             {tags.map((tag) => (
               <span
                 key={tag}
-                className="px-2.5 py-0.5 text-xs font-semibold rounded-full"
-                style={{
-                  backgroundColor: event.backgroundColor + '1a',
-                  color: event.backgroundColor,
-                }}
+                className="px-2.5 py-0.5 text-xs font-medium rounded-full"
+                style={{ backgroundColor: event.backgroundColor + '22', color: event.backgroundColor }}
               >
                 #{tag}
               </span>
@@ -197,49 +164,34 @@ function AgendaCard({ event, isLast }) {
           </div>
         </div>
       </div>
-
-      {/* 카드 사이 구분선 — 마지막 카드는 생략 */}
       {!isLast && <div className="h-px bg-gray-100" />}
     </div>
   );
 }
 
-// ── CalendarFilterPopup: 필터 팝업 ─────────────────────────
+// ── CalendarFilterPopup ─────────────────────────────────────
 function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTagChange, onClose }) {
   return (
     <div
-      className="calendar-filter-popup absolute z-50 bg-white rounded-xl shadow-xl border border-gray-200 p-5"
+      className="calendar-filter-popup absolute z-50 bg-white rounded-2xl shadow-xl border border-gray-100 p-5"
       style={{ top: '62px', right: '8px', width: '288px', maxWidth: 'calc(100vw - 24px)' }}
     >
-      {/* 헤더 */}
       <div className="flex items-center justify-between mb-1">
-        <h3 className="text-base font-bold text-gray-800">캘린더</h3>
+        <h3 className="text-sm font-bold text-gray-800">캘린더 필터</h3>
         <button
           onClick={onClose}
-          className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full text-xl font-bold transition-colors leading-none"
-          aria-label="닫기"
-        >
-          ×
-        </button>
+          className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors text-lg leading-none"
+        >×</button>
       </div>
-      <p className="text-xs text-gray-500 mb-4">표시할 캘린더를 선택하세요.</p>
+      <p className="text-xs text-gray-400 mb-4">표시할 캘린더를 선택하세요.</p>
 
-      {/* 학년 필터 */}
       <div className="mb-4">
-        <p className="text-xs font-bold text-indigo-700 uppercase tracking-wide mb-2.5">학년</p>
+        <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-2.5">학년</p>
         <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
-          {/* 전체 체크박스 */}
           <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={selectedGrades.length === 0}
-              onChange={() => onGradeChange([])}
-              className="w-4 h-4 accent-indigo-600"
-            />
-            <span className="text-sm text-gray-700">전체</span>
+            <input type="checkbox" checked={selectedGrades.length === 0} onChange={() => onGradeChange([])} className="w-4 h-4 accent-indigo-600" />
+            <span className="text-sm text-gray-600">전체</span>
           </label>
-
-          {/* 학년별 체크박스 */}
           {ALL_GRADES.map((grade) => (
             <label key={grade} className="flex items-center gap-2 cursor-pointer select-none">
               <input
@@ -247,27 +199,22 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTa
                 checked={selectedGrades.includes(grade)}
                 onChange={() =>
                   onGradeChange((prev) => {
-                    const next = prev.includes(grade)
-                      ? prev.filter((g) => g !== grade)
-                      : [...prev, grade];
-                    // 4개 모두 선택 시 전체(빈 배열)로 자동 전환
+                    const next = prev.includes(grade) ? prev.filter((g) => g !== grade) : [...prev, grade];
                     return next.length === ALL_GRADES.length ? [] : next;
                   })
                 }
                 className="w-4 h-4 accent-indigo-600"
               />
-              <span className="text-sm text-gray-700">{grade}</span>
+              <span className="text-sm text-gray-600">{grade}</span>
             </label>
           ))}
         </div>
       </div>
 
-      {/* 구분선 */}
       <div className="h-px bg-gray-100 mb-4" />
 
-      {/* 태그 필터 */}
       <div>
-        <p className="text-xs font-bold text-indigo-700 uppercase tracking-wide mb-2.5">태그</p>
+        <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-2.5">태그</p>
         <div className="flex flex-wrap gap-2">
           {ALL_TAGS.map((tag) => {
             const isSelected = selectedTags.includes(tag);
@@ -282,7 +229,7 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTa
                 className={`px-3 py-1 text-xs font-semibold rounded-full border transition-all active:scale-95 ${
                   isSelected
                     ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                    : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400 hover:text-indigo-600'
+                    : 'bg-white text-gray-500 border-gray-200 hover:border-indigo-400 hover:text-indigo-600'
                 }`}
               >
                 {tag}
@@ -292,11 +239,10 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTa
         </div>
       </div>
 
-      {/* 필터 초기화 (활성 필터가 있을 때만 표시) */}
       {(selectedGrades.length > 0 || selectedTags.length > 0) && (
         <button
           onClick={() => { onGradeChange([]); onTagChange([]); }}
-          className="mt-4 w-full text-xs text-indigo-600 hover:text-indigo-800 font-semibold py-2 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-all"
+          className="mt-4 w-full text-xs text-indigo-600 hover:text-indigo-800 font-semibold py-2 border border-indigo-200 rounded-xl hover:bg-indigo-50 transition-all"
         >
           필터 초기화
         </button>
@@ -305,22 +251,19 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTa
   );
 }
 
-// ── Home: 메인 컴포넌트 (export default) ─────────────────────
+// ── Home ────────────────────────────────────────────────────
 export default function Home() {
   const navigate = useNavigate();
 
   const [user, setUser]                     = useState(getStoredUser);
   const [selectedDate, setSelectedDate]     = useState(getTodayStr);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);  // 새 일정 등록 모달
-
-  // 필터 상태
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen]     = useState(false);
   const [selectedGrades, setSelectedGrades] = useState([]);
   const [selectedTags, setSelectedTags]     = useState([]);
 
   const hasActiveFilters = selectedGrades.length > 0 || selectedTags.length > 0;
 
-  // 팝업 외부 클릭 시 닫기
   useEffect(() => {
     if (!isFilterOpen) return;
     const handler = (e) => {
@@ -348,81 +291,78 @@ export default function Home() {
   const agendaEvents   = getEventsForDate(filteredEvents, selectedDate);
 
   return (
-    <div className="flex flex-col h-screen bg-white overflow-hidden">
+    <div className="flex flex-col h-screen bg-slate-50 overflow-hidden">
 
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           Header
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <header className="h-16 shrink-0 bg-white border-b border-gray-100 flex items-center justify-between px-6 z-10">
-        {/* 로고 */}
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
-            <span className="text-white text-sm font-extrabold">C</span>
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <header className="shrink-0 bg-white border-b border-gray-100 px-6 z-10">
+        {/* 상단 행: 로고 + 인증 영역 */}
+        <div className="h-14 flex items-center justify-between">
+          {/* 로고 */}
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 bg-indigo-600 rounded-xl flex items-center justify-center shadow-sm">
+              <span className="text-white text-sm font-extrabold">C</span>
+            </div>
+            <div>
+              <span className="text-base font-extrabold text-gray-800 tracking-tight">COM:HUB</span>
+              <span className="text-gray-300 mx-2 text-xs">/</span>
+              <span className="text-sm text-gray-500 font-medium">캘린더</span>
+            </div>
           </div>
-          <span className="text-xl font-extrabold text-gray-800 tracking-tight">COM:HUB</span>
+
+          {/* 우측 인증 영역 */}
+          <div className="flex items-center gap-2.5">
+            {user ? (
+              <>
+                <button
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 active:scale-95 transition-all shadow-sm"
+                >
+                  <span className="text-base leading-none">+</span>
+                  <span>새 일정 등록</span>
+                </button>
+
+                <button
+                  onClick={() => navigate('/profile')}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 rounded-full hover:bg-indigo-100 active:scale-95 transition-all"
+                >
+                  <div className="w-6 h-6 bg-indigo-200 rounded-full flex items-center justify-center">
+                    <span className="text-xs font-bold text-indigo-700">{user.name.charAt(0)}</span>
+                  </div>
+                  <span className="text-sm font-semibold text-indigo-700">{user.name}님</span>
+                </button>
+
+                <button
+                  onClick={handleLogout}
+                  className="px-3 py-1.5 text-sm font-medium text-gray-400 border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-gray-600 active:scale-95 transition-all"
+                >
+                  로그아웃
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => navigate('/login')}
+                className="px-4 py-1.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 active:scale-95 transition-all shadow-sm"
+              >
+                로그인
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* 우측 인증 영역 */}
-        <div className="flex items-center gap-3">
-          {user ? (
-            <>
-              {/* 새 일정 등록 — GitHub에서 추가된 모달 연동 유지 */}
-              <button
-                onClick={() => setIsAddModalOpen(true)}
-                className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 active:scale-95 transition-all shadow-sm"
-              >
-                <span className="text-base leading-none">+</span>
-                <span>새 일정 등록</span>
-              </button>
-
-              {/* 유저 뱃지 — 클릭 시 /profile */}
-              <button
-                onClick={() => navigate('/profile')}
-                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 rounded-full hover:bg-indigo-100 active:scale-95 transition-all"
-              >
-                <div className="w-6 h-6 bg-indigo-200 rounded-full flex items-center justify-center">
-                  <span className="text-xs font-bold text-indigo-700">
-                    {user.name.charAt(0)}
-                  </span>
-                </div>
-                <span className="text-sm font-semibold text-indigo-800">
-                  {user.name}님
-                </span>
-              </button>
-
-              {/* 로그아웃 */}
-              <button
-                onClick={handleLogout}
-                className="px-3 py-1.5 text-sm font-semibold text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-gray-700 active:scale-95 transition-all"
-              >
-                로그아웃
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={() => navigate('/login')}
-              className="px-5 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 active:scale-95 transition-all shadow-sm"
-            >
-              로그인
-            </button>
-          )}
-        </div>
       </header>
 
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          메인 콘텐츠 — 좌(캘린더) / 우(Daily Agenda) 분할
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <div className="flex flex-1 overflow-hidden min-h-0">
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          메인 콘텐츠 — 좌(캘린더) / 우(Daily Agenda)
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <div className="flex flex-1 overflow-hidden min-h-0 p-4 gap-4">
 
-        {/* ────────────────────────────────────────────────────
-            좌측: FullCalendar 영역 (70%)
-            position: relative — 필터 팝업 absolute 기준점
-            ──────────────────────────────────────────────────── */}
+        {/* 좌측: FullCalendar 영역 (70%) */}
         <section
-          className={`bg-white overflow-y-auto p-5 relative ${hasActiveFilters ? 'calendar-has-filters' : ''}`}
+          className={`bg-white rounded-2xl shadow-sm border border-gray-100 overflow-y-auto p-5 relative ${hasActiveFilters ? 'calendar-has-filters' : ''}`}
           style={{ flex: '7 7 0' }}
         >
-          {/* 필터 팝업 — 주별 버튼 오른쪽(fc-filterBtn-button) 아래 절대 배치 */}
           {isFilterOpen && (
             <CalendarFilterPopup
               selectedGrades={selectedGrades}
@@ -458,39 +398,29 @@ export default function Home() {
           />
         </section>
 
-        {/* ────────────────────────────────────────────────────
-            우측: Daily Agenda 패널 (30%)
-            ──────────────────────────────────────────────────── */}
+        {/* 우측: Daily Agenda 패널 (30%) */}
         <aside
-          className="border-l border-gray-200 bg-gray-50 overflow-y-auto flex flex-col"
+          className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-y-auto flex flex-col"
           style={{ flex: '3 3 0' }}
         >
-          {/* 날짜 헤더 — 스크롤해도 고정 */}
-          <div className="sticky top-0 bg-gray-50 px-6 pt-6 pb-4 border-b border-gray-200 z-10">
-            <p className="text-xs font-bold text-indigo-500 uppercase tracking-widest mb-1">
+          <div className="sticky top-0 bg-white px-6 pt-6 pb-4 border-b border-gray-100 z-10 rounded-t-2xl">
+            <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-1.5">
               Daily Agenda
             </p>
-            <h2 className="text-2xl font-extrabold text-gray-800 leading-tight">
+            <h2 className="text-lg font-extrabold text-gray-800 leading-tight">
               {formatDateLabel(selectedDate)}
             </h2>
-            <p className="text-xs text-gray-400 mt-1.5">
-              {agendaEvents.length > 0
-                ? `총 ${agendaEvents.length}개의 일정`
-                : '일정 없음'}
+            <p className="text-xs text-gray-400 mt-1">
+              {agendaEvents.length > 0 ? `총 ${agendaEvents.length}개의 일정` : '일정 없음'}
             </p>
           </div>
 
-          {/* 일정 카드 목록 */}
           <div className="px-6 py-2 flex-1">
             {agendaEvents.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full py-16 text-center select-none">
                 <div className="text-4xl mb-3">🗓️</div>
-                <p className="text-sm font-semibold text-gray-500">
-                  예정된 일정이 없습니다.
-                </p>
-                <p className="text-xs text-gray-400 mt-1.5">
-                  달력에서 다른 날짜를 클릭해 보세요.
-                </p>
+                <p className="text-sm font-semibold text-gray-500">예정된 일정이 없습니다.</p>
+                <p className="text-xs text-gray-400 mt-1.5">달력에서 다른 날짜를 클릭해 보세요.</p>
               </div>
             ) : (
               agendaEvents.map((ev, index) => (
@@ -506,11 +436,7 @@ export default function Home() {
 
       </div>
 
-      {/* 새 일정 등록 모달 — GitHub에서 추가된 기능 유지 */}
-      <EventAddModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-      />
+      <EventAddModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
     </div>
   );
 }

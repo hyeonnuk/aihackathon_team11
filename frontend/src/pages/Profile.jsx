@@ -86,26 +86,30 @@ export default function Profile() {
     }
   };
 
-  if (isLoading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-500 font-semibold">데이터를 불러오는 중...</div>;
+  if (isLoading) return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="text-sm text-gray-400 font-medium">데이터를 불러오는 중...</div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6">
 
       {/* 뒤로 가기 */}
       <div className="w-full max-w-lg mb-4">
         <button
           onClick={() => navigate('/')}
-          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-indigo-600 transition-colors"
+          className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-indigo-600 transition-colors font-medium"
         >
           ← 대시보드로 돌아가기
         </button>
       </div>
 
       {/* 프로필 카드 */}
-      <div className="w-full max-w-lg bg-white rounded-2xl shadow-md overflow-hidden">
+      <div className="w-full max-w-lg bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
 
         {/* 상단 배너 */}
-        <div className="h-24 bg-gradient-to-r from-indigo-500 to-blue-500" />
+        <div className="h-24 bg-gradient-to-r from-indigo-500 to-violet-500" />
 
         {/* 아바타 + 기본 정보 */}
         <div className="px-6 pb-6">
@@ -148,12 +152,12 @@ export default function Profile() {
           <div className="h-px bg-gray-100 my-5" />
 
           {/* 뱃지 */}
-          <h2 className="text-sm font-bold text-gray-700 mb-3">획득한 뱃지</h2>
+          <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-2">뱃지</p>
           <div className="flex flex-wrap gap-2">
             {BADGES.map((badge) => (
               <span
                 key={badge}
-                className="px-3 py-1 bg-gray-100 text-gray-600 text-xs font-semibold rounded-full"
+                className="px-3 py-1 bg-indigo-50 text-indigo-600 text-xs font-semibold rounded-full border border-indigo-100"
               >
                 {badge}
               </span>
@@ -164,30 +168,30 @@ export default function Profile() {
           <div className="h-px bg-gray-100 my-5" />
 
           {/* 본인이 쓴 글 */}
-          <h2 className="text-sm font-bold text-gray-700 mb-3">본인이 쓴 글</h2>
+          <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-2">작성한 글</p>
           <div className="flex flex-col gap-2 mb-5">
             {MY_POSTS.map((post) => (
-              <div 
-                key={post.id} 
+              <div
+                key={post.id}
                 onClick={() => navigate(`/post/${post.id}`)}
-                className="p-3 bg-gray-50 border border-gray-100 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer"
+                className="p-3 bg-slate-50 border border-gray-100 rounded-xl hover:border-indigo-200 hover:bg-indigo-50/30 transition-all cursor-pointer"
               >
-                <p className="text-sm font-semibold text-gray-800">{post.title}</p>
+                <p className="text-sm font-semibold text-gray-700">{post.title}</p>
                 <p className="text-xs text-gray-400 mt-1">{post.date}</p>
               </div>
             ))}
           </div>
 
           {/* 본인이 쓴 댓글 */}
-          <h2 className="text-sm font-bold text-gray-700 mb-3">본인이 쓴 댓글</h2>
+          <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-2">작성한 댓글</p>
           <div className="flex flex-col gap-2">
             {MY_COMMENTS.map((comment) => (
-              <div 
-                key={comment.id} 
+              <div
+                key={comment.id}
                 onClick={() => navigate(`/post/${comment.postId}`)}
-                className="p-3 bg-gray-50 border border-gray-100 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer"
+                className="p-3 bg-slate-50 border border-gray-100 rounded-xl hover:border-indigo-200 hover:bg-indigo-50/30 transition-all cursor-pointer"
               >
-                <p className="text-xs text-indigo-600 font-medium mb-1">원문: {comment.postTitle}</p>
+                <p className="text-xs text-indigo-500 font-medium mb-1">원문: {comment.postTitle}</p>
                 <p className="text-sm text-gray-700">{comment.content}</p>
                 <p className="text-xs text-gray-400 mt-1">{comment.date}</p>
               </div>

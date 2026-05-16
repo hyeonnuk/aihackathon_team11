@@ -109,18 +109,19 @@ export default function Signup() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-blue-50 p-4">
-      <div className="mx-auto flex min-h-screen w-full max-w-lg items-center justify-center">
-        <div className="w-full rounded-2xl bg-white p-8 shadow-xl">
-          <div className="mb-7 flex items-center justify-center gap-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 shadow-md">
-              <span className="text-base font-extrabold text-white">C</span>
-            </div>
-            <span className="text-2xl font-extrabold tracking-tight text-gray-800">COM:HUB</span>
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+      <div className="mx-auto w-full max-w-lg">
+        <div className="mb-7 flex items-center gap-2.5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 shadow-sm">
+            <span className="text-sm font-extrabold text-white">C</span>
           </div>
+          <span className="text-lg font-extrabold tracking-tight text-gray-800">COM:HUB</span>
+        </div>
 
-          <div className="mb-7 text-center">
-            <h1 className="text-xl font-bold text-gray-800">회원가입</h1>
+        <div className="w-full rounded-2xl bg-white p-8 shadow-sm border border-gray-100">
+          <div className="mb-7">
+            <p className="text-xs font-bold text-indigo-500 uppercase tracking-widest mb-2">회원가입</p>
+            <h1 className="text-2xl font-extrabold text-gray-800">계정을 만들어보세요</h1>
             <p className="mt-1.5 text-sm text-gray-400">서비스 이용을 위한 정보를 입력하세요</p>
           </div>
 
@@ -241,5 +242,7 @@ export default function Signup() {
         </div>
       </div>
     </div>
+
   );
 }
+
