@@ -62,7 +62,7 @@ export default function Login() {
           <h2 className="text-3xl font-extrabold text-white leading-snug mb-3">
             일정을 함께<br />관리하세요
           </h2>
-          <p className="text-indigo-200 text-sm leading-relaxed">
+          <p className="text-primary-200 text-sm leading-relaxed">
             COM:HUB로 학교 일정, 스터디, 공모전 등<br />
             모든 활동을 한눈에 확인하세요.
           </p>
@@ -136,7 +136,7 @@ export default function Login() {
             <button
               type="button"
               onClick={() => navigate('/signup')}
-              className="font-semibold text-primary-500 hover:text-indigo-700"
+              className="font-semibold text-primary-500 hover:text-primary-600"
             >
               회원가입
             </button>

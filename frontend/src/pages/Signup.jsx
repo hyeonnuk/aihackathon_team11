@@ -256,7 +256,7 @@ export default function Signup() {
 
           <div className="mt-6 flex items-center justify-center gap-2 text-sm">
             <span className="text-gray-400">이미 계정이 있으신가요?</span>
-            <button type="button" onClick={() => navigate('/login')} className="font-semibold text-primary-500 hover:text-indigo-700">
+            <button type="button" onClick={() => navigate('/login')} className="font-semibold text-primary-500 hover:text-primary-600">
               로그인
             </button>
           </div>

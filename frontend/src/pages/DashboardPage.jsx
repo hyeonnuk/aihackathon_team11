@@ -84,7 +84,7 @@ function RecruitCard({ field, author }) {
     <div className="border border-gray-100 rounded-xl p-4 bg-gray-50 hover:shadow-md transition-shadow duration-150">
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-col gap-1.5">
-          <span className="inline-block w-fit px-2.5 py-0.5 bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-full">
+          <span className="inline-block w-fit px-2.5 py-0.5 bg-primary-100 text-primary-600 text-xs font-semibold rounded-full">
             {field}
           </span>
           <p className="text-xs text-gray-500">
@@ -93,7 +93,7 @@ function RecruitCard({ field, author }) {
         </div>
         <button
           onClick={() => alert(`"${field}" 포지션에 지원했습니다! 작성자(${author})에게 알림이 전송됩니다.`)}
-          className="shrink-0 px-3 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 active:scale-95 transition-all shadow-sm"
+          className="shrink-0 px-3 py-1.5 bg-primary-500 text-white text-xs font-semibold rounded-lg hover:bg-primary-600 active:scale-95 transition-all shadow-sm"
         >
           지원하기
         </button>
@@ -109,7 +109,7 @@ function DetailPanel({ selectedEvent }) {
   if (!selectedEvent) {
     return (
       <div className="flex flex-col items-center justify-center flex-1 text-center select-none py-12">
-        <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mb-4 text-3xl">
+        <div className="w-16 h-16 bg-primary-50 rounded-full flex items-center justify-center mb-4 text-3xl">
           📅
         </div>
         <p className="text-sm font-semibold text-gray-600">달력에서 일정을 선택해주세요</p>
@@ -124,7 +124,7 @@ function DetailPanel({ selectedEvent }) {
     <div className="flex flex-col gap-5">
       <div className="pb-4 border-b border-gray-100">
         <h2 className="text-lg font-bold text-gray-800 leading-snug">{selectedEvent.title}</h2>
-        <p className="mt-1 text-sm font-semibold text-indigo-600">{selectedEvent.dateLabel}</p>
+        <p className="mt-1 text-sm font-semibold text-primary-500">{selectedEvent.dateLabel}</p>
         <p className="mt-2 text-xs text-gray-500 leading-relaxed">{selectedEvent.description}</p>
       </div>
       <div>
@@ -189,7 +189,7 @@ export default function DashboardPage() {
 
         {/* 좌측 로고 */}
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
+          <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center shadow-sm">
             <span className="text-white text-sm font-extrabold">C</span>
           </div>
           <span className="text-xl font-extrabold text-gray-800 tracking-tight">COM:HUB</span>
@@ -203,20 +203,20 @@ export default function DashboardPage() {
               {/* 새 일정 등록 버튼 */}
               <button 
                 onClick={() => setIsAddModalOpen(true)}
-                className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 active:scale-95 transition-all shadow-sm"
+                className="flex items-center gap-1.5 px-4 py-2 bg-primary-500 text-white text-sm font-semibold rounded-lg hover:bg-primary-600 active:scale-95 transition-all shadow-sm"
               >
                 <span className="text-base leading-none">+</span>
                 <span>새 일정 등록</span>
               </button>
 
               {/* 유저 뱃지 */}
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 rounded-full">
-                <div className="w-6 h-6 bg-indigo-200 rounded-full flex items-center justify-center">
-                  <span className="text-xs font-bold text-indigo-700">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-primary-50 rounded-full">
+                <div className="w-6 h-6 bg-primary-200 rounded-full flex items-center justify-center">
+                  <span className="text-xs font-bold text-primary-600">
                     {user.name.charAt(0)}
                   </span>
                 </div>
-                <span className="text-sm font-semibold text-indigo-800">
+                <span className="text-sm font-semibold text-primary-700">
                   {user.name}님 환영합니다
                 </span>
               </div>
@@ -233,7 +233,7 @@ export default function DashboardPage() {
             // ── 비로그인 상태 ─────────────────────────────────────
             <button
               onClick={() => navigate('/login')}
-              className="px-5 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 active:scale-95 transition-all shadow-sm"
+              className="px-5 py-2 bg-primary-500 text-white text-sm font-semibold rounded-lg hover:bg-primary-600 active:scale-95 transition-all shadow-sm"
             >
               로그인
             </button>

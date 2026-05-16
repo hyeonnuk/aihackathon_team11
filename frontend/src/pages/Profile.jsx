@@ -17,7 +17,7 @@ function getStoredUser() {
 const BADGE_CONFIG = {
   BABY_MUHAN: { id: 'b1', label: '아기 무한이', icon: '👶', style: 'bg-sky-50 text-sky-700 border-sky-200 ring-sky-100', description: '캘린더에 일정 1회 이상 등록' },
   ADULT_MUHAN: { id: 'b2', label: '어른 무한이', icon: '🧑', style: 'bg-blue-50 text-blue-700 border-blue-200 ring-blue-100', description: '캘린더 일정 10회 이상 등록' },
-  GRANDMA_MUHAN: { id: 'b3', label: '할미 무한이', icon: '👵', style: 'bg-indigo-50 text-indigo-700 border-indigo-200 ring-indigo-100', description: '캘린더 일정 50회 이상 등록' },
+  GRANDMA_MUHAN: { id: 'b3', label: '할미 무한이', icon: '👵', style: 'bg-primary-50 text-primary-600 border-primary-200 ring-primary-100', description: '캘린더 일정 50회 이상 등록' },
   HACKATHON: { id: 'b4', label: '해커톤 참여자', icon: '💻', style: 'bg-violet-50 text-violet-700 border-violet-200 ring-violet-100', description: '해커톤 참여' },
   STRAIGHT_MUHAN: { id: 'b5', label: '직진중인 무한이', icon: '🏃', style: 'bg-emerald-50 text-emerald-700 border-emerald-200 ring-emerald-100', description: '댓글 3회 이상 작성' },
   SPEEDING_MUHAN: { id: 'b6', label: '과속 무한이', icon: '💨', style: 'bg-orange-50 text-orange-700 border-orange-200 ring-orange-100', description: '댓글 5회 이상 작성' },
@@ -31,7 +31,7 @@ const BADGE_CONFIG = {
   SMART_MUHAN: { id: 'b12', label: '똑똑한 무한이', icon: '🤓', style: 'bg-cyan-50 text-cyan-700 border-cyan-200 ring-cyan-100', description: '내 글에 좋아요 1회 이상 받기' },
   COMPETENT_MUHAN: { id: 'b13', label: '유능한 무한이', icon: '💼', style: 'bg-teal-50 text-teal-700 border-teal-200 ring-teal-100', description: '내 글에 좋아요 5회 이상 받기' },
   BACHELOR_MUHAN: { id: 'b14', label: '학사 무한이', icon: '🎓', style: 'bg-blue-50 text-blue-800 border-blue-300 ring-blue-200', description: '내 글에 좋아요 20회 이상 받기' },
-  MASTER_MUHAN: { id: 'b15', label: '석사 무한이', icon: '📜', style: 'bg-indigo-50 text-indigo-800 border-indigo-300 ring-indigo-200', description: '내 글에 좋아요 40회 이상 받기' },
+  MASTER_MUHAN: { id: 'b15', label: '석사 무한이', icon: '📜', style: 'bg-primary-50 text-primary-700 border-primary-300 ring-primary-200', description: '내 글에 좋아요 40회 이상 받기' },
   DOCTOR_MUHAN: { id: 'b16', label: '박사 무한이', icon: '🔬', style: 'bg-violet-50 text-violet-800 border-violet-300 ring-violet-200', description: '내 글에 좋아요 100회 이상 받기' },
 
   HATER_MUHAN: { id: 'b17', label: '싫어하는 무한이', icon: '😒', style: 'bg-stone-50 text-stone-700 border-stone-200 ring-stone-100', description: '싫어요 5회 이상 누르기' },
@@ -118,6 +118,12 @@ function readFileAsDataUrl(file) {
   });
 }
 
+function extractList(payload, key) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.[key])) return payload[key];
+  return [];
+}
+
 export default function Profile() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
@@ -157,36 +163,27 @@ export default function Profile() {
         if (fetchedPosts.length === 0) {
           try {
             const postsRes = await fetch(`${API_BASE_URL}/api/users/${user.id}/posts`);
-            if (postsRes.ok) fetchedPosts = await postsRes.json();
+            if (postsRes.ok) fetchedPosts = extractList(await postsRes.json(), 'posts');
           } catch (e) { /* ignore */ }
         }
 
         if (fetchedComments.length === 0) {
           try {
             const commentsRes = await fetch(`${API_BASE_URL}/api/users/${user.id}/comments`);
-            if (commentsRes.ok) fetchedComments = await commentsRes.json();
+            if (commentsRes.ok) fetchedComments = extractList(await commentsRes.json(), 'comments');
           } catch (e) { /* ignore */ }
-        }
-
-        // 🌟 백엔드 미구현/지연으로 인해 로컬에서 작성한 테스트 내용이 초기화되는 것을 방지 (병합 로직)
-        if (Array.isArray(localUser.posts) && localUser.posts.length > fetchedPosts.length) {
-          fetchedPosts = localUser.posts;
-        }
-        if (Array.isArray(localUser.comments) && localUser.comments.length > fetchedComments.length) {
-          fetchedComments = localUser.comments;
         }
 
         // 🌟 실제 DB 통계와 로컬 통계 중 더 높은 값 사용 (자동 뱃지 부여 보장)
         const serverStats = latestUser.stats || {};
-        const localStatsObj = localUser.stats || {};
         const realStats = {
-          scheduleCount: Math.max(serverStats.scheduleCount || 0, localStatsObj.scheduleCount || 0),
-          hasJoinedHackathon: serverStats.hasJoinedHackathon || localStatsObj.hasJoinedHackathon || false,
-          commentCount: Math.max(serverStats.commentCount || 0, localStatsObj.commentCount || 0, fetchedComments.length),
-          isFirstCommenter: serverStats.isFirstCommenter || localStatsObj.isFirstCommenter || false,
-          likesCount: Math.max(serverStats.likesCount || 0, localStatsObj.likesCount || 0),
-          receivedLikesCount: Math.max(serverStats.receivedLikesCount || 0, localStatsObj.receivedLikesCount || 0),
-          dislikesCount: Math.max(serverStats.dislikesCount || 0, localStatsObj.dislikesCount || 0)
+          scheduleCount: serverStats.scheduleCount ?? fetchedPosts.length,
+          hasJoinedHackathon: serverStats.hasJoinedHackathon || false,
+          commentCount: serverStats.commentCount ?? fetchedComments.length,
+          isFirstCommenter: serverStats.isFirstCommenter || false,
+          likesCount: serverStats.likesCount || 0,
+          receivedLikesCount: serverStats.receivedLikesCount || 0,
+          dislikesCount: serverStats.dislikesCount || 0
         };
 
         const updatedUser = { ...localUser, ...latestUser, stats: realStats, posts: fetchedPosts, comments: fetchedComments };
@@ -265,14 +262,14 @@ export default function Profile() {
       <div className="mb-4 w-full max-w-lg">
         <button
           onClick={() => navigate('/')}
-          className="text-sm font-medium text-gray-400 transition-colors hover:text-indigo-600"
+          className="text-sm font-medium text-gray-400 transition-colors hover:text-primary-500"
         >
           대시보드로 돌아가기
         </button>
       </div>
 
       <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-        <div className="h-24 bg-gradient-to-r from-indigo-500 to-violet-500" />
+        <div className="h-24 bg-gradient-to-r from-primary-500 to-violet-500" />
 
         <div className="px-6 pb-6">
           <div className="-mt-10 mb-4 flex items-end justify-between">
@@ -280,7 +277,7 @@ export default function Profile() {
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
-              className="group relative flex h-20 w-20 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-indigo-600 shadow-md disabled:cursor-wait"
+              className="group relative flex h-20 w-20 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-primary-500 shadow-md disabled:cursor-wait"
             >
               {profileImage ? (
                 <img src={profileImage} alt="프로필" className="h-full w-full object-cover" />
@@ -312,10 +309,10 @@ export default function Profile() {
 
           {/* 뱃지 */}
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-500">획득한 뱃지</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-primary-500">획득한 뱃지</p>
             <button 
               onClick={() => setShowBadgeInfo(true)}
-              className="flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 active:scale-95 transition-all shadow-sm"
+              className="flex items-center gap-1 px-2.5 py-1 bg-primary-50 text-primary-500 rounded-lg text-xs font-bold hover:bg-primary-100 active:scale-95 transition-all shadow-sm"
               title="뱃지 획득 조건 안내"
             >
               <span className="text-sm">💡</span>
@@ -341,7 +338,7 @@ export default function Profile() {
           <div className="my-5 h-px bg-gray-100" />
 
           {/* 본인이 쓴 글 */}
-          <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-indigo-500">
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-primary-500">
             작성한 글
           </p>
           <div className="mb-5 flex flex-col gap-2">
@@ -350,8 +347,8 @@ export default function Profile() {
                 <button
                   key={post.id}
                   type="button"
-                  onClick={() => navigate(`/post/${post.id}`)}
-                  className="rounded-xl border border-gray-100 bg-slate-50 p-3 text-left transition-all hover:border-indigo-200 hover:bg-indigo-50/30"
+                  onClick={() => navigate(`/?scheduleId=${post.id}`)}
+                  className="rounded-xl border border-gray-100 bg-slate-50 p-3 text-left transition-all hover:border-primary-200 hover:bg-primary-50/30"
                 >
                   <p className="text-sm font-semibold text-gray-700">{post.title || post.subject || '제목 없음'}</p>
                   <p className="mt-1 text-xs text-gray-400">{post.date || post.createdAt || post.created_at}</p>
@@ -370,7 +367,7 @@ export default function Profile() {
             )}
           </div>
 
-          <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-indigo-500">
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-primary-500">
             작성한 댓글
           </p>
           <div className="flex flex-col gap-2">
@@ -379,10 +376,12 @@ export default function Profile() {
                 <button
                   key={comment.id}
                   type="button"
-                  onClick={() => navigate(`/post/${comment.postId || comment.post_id}`)}
-                  className="rounded-xl border border-gray-100 bg-slate-50 p-3 text-left transition-all hover:border-indigo-200 hover:bg-indigo-50/30"
+                  onClick={() =>
+                    navigate(`/?scheduleId=${comment.scheduleId || comment.postId || comment.post_id}&commentId=${comment.id}`)
+                  }
+                  className="rounded-xl border border-gray-100 bg-slate-50 p-3 text-left transition-all hover:border-primary-200 hover:bg-primary-50/30"
                 >
-                  <p className="mb-1 text-xs font-medium text-indigo-500">
+                  <p className="mb-1 text-xs font-medium text-primary-500">
                     원문: {comment.postTitle || comment.post_title || '게시글 확인하기'}
                   </p>
                   <p className="text-sm text-gray-700">{comment.content || comment.body || '내용 없음'}</p>
@@ -435,7 +434,7 @@ export default function Profile() {
                         <div 
                           key={badge.id} 
                           className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
-                            isEarned ? 'bg-white border-indigo-100 shadow-sm' : 'bg-gray-100/50 border-transparent grayscale opacity-50'
+                            isEarned ? 'bg-white border-primary-100 shadow-sm' : 'bg-gray-100/50 border-transparent grayscale opacity-50'
                           }`}
                         >
                           <div className={`flex items-center gap-1.5 px-3 py-1.5 border shadow-sm rounded-full shrink-0 ${badge.style}`}>
@@ -444,7 +443,7 @@ export default function Profile() {
                           </div>
                           <div className="flex flex-col">
                             <span className="text-xs text-gray-700 font-medium break-keep">{badge.description}</span>
-                            {isEarned && <span className="text-[10px] text-indigo-500 font-bold mt-0.5 tracking-tight">획득 완료!</span>}
+                            {isEarned && <span className="text-[10px] text-primary-500 font-bold mt-0.5 tracking-tight">획득 완료!</span>}
                           </div>
                         </div>
                       );
@@ -457,7 +456,7 @@ export default function Profile() {
             <div className="p-4 border-t border-gray-100 bg-white">
               <button 
                 onClick={() => setShowBadgeInfo(false)} 
-                className="w-full py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm"
+                className="w-full py-2.5 bg-primary-500 text-white rounded-xl text-sm font-bold hover:bg-primary-600 transition-colors shadow-sm"
               >
                 확인
               </button>
