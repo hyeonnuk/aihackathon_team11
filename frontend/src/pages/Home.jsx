@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import '../App.css';
 import EventAddModal from '../components/EventAddModal';
 import EventDetailPanel from '../components/EventDetailPanel';
@@ -487,6 +487,8 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTa
 
 export default function Home() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const openedTargetRef = useRef(null);
   const calendarRef = useRef(null);
 
   const [user, setUser] = useState(getStoredUser);
@@ -524,6 +526,23 @@ export default function Home() {
   useEffect(() => {
     loadSchedules();
   }, []);
+
+  useEffect(() => {
+    const scheduleId = searchParams.get('scheduleId');
+    const commentId = searchParams.get('commentId');
+    if (!scheduleId || events.length === 0) return;
+
+    const targetKey = `${scheduleId}:${commentId || ''}`;
+    if (openedTargetRef.current === targetKey) return;
+
+    const targetEvent = events.find((event) => String(event.extendedProps.scheduleId) === scheduleId);
+    if (!targetEvent) return;
+
+    openedTargetRef.current = targetKey;
+    setSelectedDate(targetEvent.start);
+    setDetailEventId(targetEvent.id);
+    setPanelView('detail');
+  }, [events, searchParams]);
 
   useEffect(() => {
     if (!isFilterOpen) return;
@@ -924,6 +943,7 @@ export default function Home() {
               onAddComment={(content) => handleAddComment(detailEventId, content)}
               onEdit={user ? () => handleOpenEdit(detailEventId) : undefined}
               onDelete={user ? () => handleDeleteEvent(detailEventId) : undefined}
+              highlightedCommentId={searchParams.get('commentId')}
               user={user}
             />
           ) : null}

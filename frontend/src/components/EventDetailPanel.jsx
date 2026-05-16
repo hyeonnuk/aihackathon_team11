@@ -3,7 +3,7 @@
 //  일정 상세 패널 — 정보, 좋아요/싫어요, 댓글
 // ============================================================
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -63,9 +63,21 @@ function SmallReactionBtn({ emoji, count, isActive, onClick }) {
   );
 }
 
-function CommentCard({ comment, onReact }) {
+function CommentCard({ comment, onReact, isHighlighted }) {
+  const cardRef = useRef(null);
+
+  useEffect(() => {
+    if (!isHighlighted) return;
+    cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [isHighlighted]);
+
   return (
-    <div className="py-4">
+    <div
+      ref={cardRef}
+      className={`py-4 transition-colors ${
+        isHighlighted ? 'rounded-xl bg-indigo-50 px-3 ring-2 ring-indigo-200' : ''
+      }`}
+    >
       {/* 댓글 헤더 */}
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
@@ -112,6 +124,7 @@ export default function EventDetailPanel({
   onAddComment,
   onEdit,
   onDelete,
+  highlightedCommentId,
   user,
 }) {
   const [commentText, setCommentText] = useState('');
@@ -329,7 +342,12 @@ export default function EventDetailPanel({
           ) : (
             <div className="divide-y divide-gray-100">
               {ep.comments.map((c) => (
-                <CommentCard key={c.id} comment={c} onReact={onCommentReact} />
+                <CommentCard
+                  key={c.id}
+                  comment={c}
+                  onReact={onCommentReact}
+                  isHighlighted={String(c.id) === String(highlightedCommentId)}
+                />
               ))}
             </div>
           )}

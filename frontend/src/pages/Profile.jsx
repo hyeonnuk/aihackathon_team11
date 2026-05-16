@@ -118,6 +118,12 @@ function readFileAsDataUrl(file) {
   });
 }
 
+function extractList(payload, key) {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.[key])) return payload[key];
+  return [];
+}
+
 export default function Profile() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
@@ -157,36 +163,27 @@ export default function Profile() {
         if (fetchedPosts.length === 0) {
           try {
             const postsRes = await fetch(`${API_BASE_URL}/api/users/${user.id}/posts`);
-            if (postsRes.ok) fetchedPosts = await postsRes.json();
+            if (postsRes.ok) fetchedPosts = extractList(await postsRes.json(), 'posts');
           } catch (e) { /* ignore */ }
         }
 
         if (fetchedComments.length === 0) {
           try {
             const commentsRes = await fetch(`${API_BASE_URL}/api/users/${user.id}/comments`);
-            if (commentsRes.ok) fetchedComments = await commentsRes.json();
+            if (commentsRes.ok) fetchedComments = extractList(await commentsRes.json(), 'comments');
           } catch (e) { /* ignore */ }
-        }
-
-        // 🌟 백엔드 미구현/지연으로 인해 로컬에서 작성한 테스트 내용이 초기화되는 것을 방지 (병합 로직)
-        if (Array.isArray(localUser.posts) && localUser.posts.length > fetchedPosts.length) {
-          fetchedPosts = localUser.posts;
-        }
-        if (Array.isArray(localUser.comments) && localUser.comments.length > fetchedComments.length) {
-          fetchedComments = localUser.comments;
         }
 
         // 🌟 실제 DB 통계와 로컬 통계 중 더 높은 값 사용 (자동 뱃지 부여 보장)
         const serverStats = latestUser.stats || {};
-        const localStatsObj = localUser.stats || {};
         const realStats = {
-          scheduleCount: Math.max(serverStats.scheduleCount || 0, localStatsObj.scheduleCount || 0),
-          hasJoinedHackathon: serverStats.hasJoinedHackathon || localStatsObj.hasJoinedHackathon || false,
-          commentCount: Math.max(serverStats.commentCount || 0, localStatsObj.commentCount || 0, fetchedComments.length),
-          isFirstCommenter: serverStats.isFirstCommenter || localStatsObj.isFirstCommenter || false,
-          likesCount: Math.max(serverStats.likesCount || 0, localStatsObj.likesCount || 0),
-          receivedLikesCount: Math.max(serverStats.receivedLikesCount || 0, localStatsObj.receivedLikesCount || 0),
-          dislikesCount: Math.max(serverStats.dislikesCount || 0, localStatsObj.dislikesCount || 0)
+          scheduleCount: serverStats.scheduleCount ?? fetchedPosts.length,
+          hasJoinedHackathon: serverStats.hasJoinedHackathon || false,
+          commentCount: serverStats.commentCount ?? fetchedComments.length,
+          isFirstCommenter: serverStats.isFirstCommenter || false,
+          likesCount: serverStats.likesCount || 0,
+          receivedLikesCount: serverStats.receivedLikesCount || 0,
+          dislikesCount: serverStats.dislikesCount || 0
         };
 
         const updatedUser = { ...localUser, ...latestUser, stats: realStats, posts: fetchedPosts, comments: fetchedComments };
@@ -350,7 +347,7 @@ export default function Profile() {
                 <button
                   key={post.id}
                   type="button"
-                  onClick={() => navigate(`/post/${post.id}`)}
+                  onClick={() => navigate(`/?scheduleId=${post.id}`)}
                   className="rounded-xl border border-gray-100 bg-slate-50 p-3 text-left transition-all hover:border-indigo-200 hover:bg-indigo-50/30"
                 >
                   <p className="text-sm font-semibold text-gray-700">{post.title || post.subject || '제목 없음'}</p>
@@ -379,7 +376,9 @@ export default function Profile() {
                 <button
                   key={comment.id}
                   type="button"
-                  onClick={() => navigate(`/post/${comment.postId || comment.post_id}`)}
+                  onClick={() =>
+                    navigate(`/?scheduleId=${comment.scheduleId || comment.postId || comment.post_id}&commentId=${comment.id}`)
+                  }
                   className="rounded-xl border border-gray-100 bg-slate-50 p-3 text-left transition-all hover:border-indigo-200 hover:bg-indigo-50/30"
                 >
                   <p className="mb-1 text-xs font-medium text-indigo-500">
