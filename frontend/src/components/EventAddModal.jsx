@@ -43,6 +43,41 @@ function toApiDateTime(value) {
   return value ? `${value.replace('T', ' ')}:00` : '';
 }
 
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+  const h = String(Math.floor(i / 2)).padStart(2, '0');
+  const m = i % 2 === 0 ? '00' : '30';
+  return `${h}:${m}`;
+});
+
+function DateTimePicker({ value, onChange, required }) {
+  const [date, time] = value ? value.split('T') : ['', '09:00'];
+  const setDate = (d) => onChange({ target: { value: d ? `${d}T${time || '09:00'}` : '' } });
+  const setTime = (t) => onChange({ target: { value: date ? `${date}T${t}` : '' } });
+
+  return (
+    <div className="grid grid-cols-[7fr_3fr] gap-2">
+      <input
+        type="date"
+        value={date}
+        onChange={(e) => setDate(e.target.value)}
+        required={required}
+        className={INPUT}
+      />
+      <select
+        value={time || '09:00'}
+        onChange={(e) => setTime(e.target.value)}
+        disabled={!date}
+        className={`${INPUT} w-full disabled:opacity-40 disabled:cursor-not-allowed`}
+      >
+        {TIME_OPTIONS.map((t) => (
+          <option key={t} value={t}>{t}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+
 function toHashtagText(hashtags) {
   return hashtags.length > 0 ? hashtags.map((tag) => `#${tag}`).join(' ') : null;
 }
@@ -199,6 +234,26 @@ export default function EventAddModal({ isOpen, onClose, onCreated, initialData 
 
         <div className="flex-1 overflow-y-auto">
           <form id="event-add-form" onSubmit={handleSubmit} className="flex flex-col gap-5 px-6 py-5">
+            <Field label="공지 여부">
+              <label className="flex h-[46px] cursor-pointer select-none items-center gap-3">
+                <div className="relative shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={form.notice}
+                    className="peer sr-only"
+                    onChange={(event) =>
+                      setForm((prev) => ({ ...prev, notice: event.target.checked }))
+                    }
+                  />
+                  <div className="h-6 w-10 rounded-full bg-gray-200 transition-colors duration-200 peer-checked:bg-primary-500" />
+                  <div className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-4" />
+                </div>
+                {form.notice && (
+                  <span className="text-sm text-gray-600">공지로 등록됩니다</span>
+                )}
+              </label>
+            </Field>
+
             <Field label="제목" required>
               <input
                 type="text"
@@ -210,26 +265,13 @@ export default function EventAddModal({ isOpen, onClose, onCreated, initialData 
               />
             </Field>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="시작일자" required>
-                <input
-                  type="datetime-local"
-                  value={form.startDate}
-                  onChange={set('startDate')}
-                  required
-                  className={INPUT}
-                />
-              </Field>
-              <Field label="마감일자">
-                <input
-                  type="datetime-local"
-                  value={form.endDate}
-                  onChange={set('endDate')}
-                  className={INPUT}
-                />
-                <p className="mt-1 text-xs text-gray-400">비우면 시작일자와 동일하게 저장됩니다.</p>
-              </Field>
-            </div>
+            <Field label="시작일자" required>
+              <DateTimePicker value={form.startDate} onChange={set('startDate')} required />
+            </Field>
+            <Field label="마감일자">
+              <DateTimePicker value={form.endDate} onChange={set('endDate')} />
+              <p className="mt-1 text-xs text-gray-400">비우면 시작일자와 동일하게 저장됩니다.</p>
+            </Field>
 
             <Field label="내용" required>
               <textarea
@@ -281,37 +323,15 @@ export default function EventAddModal({ isOpen, onClose, onCreated, initialData 
               />
             </Field>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="대상 학년" required>
-                <select value={form.grade} onChange={set('grade')} className={INPUT}>
-                  {GRADES.map((grade) => (
-                    <option key={grade.value} value={grade.value}>
-                      {grade.label}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field label="공지 여부">
-                <label className="flex h-[46px] cursor-pointer select-none items-center gap-3">
-                  <div className="relative shrink-0">
-                    <input
-                      type="checkbox"
-                      checked={form.notice}
-                      className="peer sr-only"
-                      onChange={(event) =>
-                        setForm((prev) => ({ ...prev, notice: event.target.checked }))
-                      }
-                    />
-                    <div className="h-6 w-10 rounded-full bg-gray-200 transition-colors duration-200 peer-checked:bg-primary-500" />
-                    <div className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform duration-200 peer-checked:translate-x-4" />
-                  </div>
-                  <span className="text-sm text-gray-600">
-                    {form.notice ? '공지로 등록됩니다' : '일반 일정으로 등록됩니다'}
-                  </span>
-                </label>
-              </Field>
-            </div>
+            <Field label="대상 학년" required>
+              <select value={form.grade} onChange={set('grade')} className={INPUT}>
+                {GRADES.map((grade) => (
+                  <option key={grade.value} value={grade.value}>
+                    {grade.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
 
             <Field label="해시태그">
               <div className="flex flex-wrap gap-2">
@@ -342,22 +362,6 @@ export default function EventAddModal({ isOpen, onClose, onCreated, initialData 
               </div>
             </Field>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field label="작성자">
-                <input
-                  type="text"
-                  value={form.author}
-                  readOnly
-                  className={`${INPUT} cursor-not-allowed bg-gray-50 text-gray-400`}
-                />
-              </Field>
-              <Field label="좋아요 수">
-                <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-400">
-                  <span>0</span>
-                  <span>등록 후 집계됩니다</span>
-                </div>
-              </Field>
-            </div>
           </form>
         </div>
 
