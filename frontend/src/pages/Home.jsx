@@ -1006,7 +1006,7 @@ export default function Home() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-white">
-      <header className="z-10 flex h-16 shrink-0 items-center justify-between border-b border-gray-100 bg-white px-6">
+      <header className="z-10 flex h-16 shrink-0 items-center justify-between border-b border-gray-200 bg-[#F6F7FB] px-6">
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-500 shadow-sm">
             <span className="text-sm font-extrabold text-white">C</span>
