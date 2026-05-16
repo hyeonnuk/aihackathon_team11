@@ -251,6 +251,18 @@ class CommentCreateRequest(BaseModel):
         return value
 
 
+class CommentUpdateRequest(BaseModel):
+    content: str = Field(min_length=1)
+
+    @field_validator("content")
+    @classmethod
+    def strip_comment_content(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("must not be blank")
+        return value
+
+
 def create_database_if_needed() -> None:
     try:
         connection = mysql.connector.connect(
@@ -533,6 +545,26 @@ def ensure_notice_permission(notice: bool, authorization: str | None) -> None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only master or admin can create or update notices.",
+        )
+
+
+def can_manage_schedule(current_user: dict, schedule_author: str | None) -> bool:
+    if current_user.get("role") in ("master", "admin"):
+        return True
+    if not schedule_author:
+        return False
+
+    author = schedule_author.strip()
+    user_name = (current_user.get("name") or "").strip()
+    login_id = (current_user.get("login_id") or "").strip()
+    return author in {user_name, login_id} or (bool(user_name) and author.endswith(f" {user_name}"))
+
+
+def require_schedule_manager(current_user: dict, schedule_author: str | None) -> None:
+    if not can_manage_schedule(current_user, schedule_author):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the schedule author, admin, or master can modify this schedule.",
         )
 
 
@@ -1027,6 +1059,21 @@ def list_schedule_comments_for_test(schedule_id: int):
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Schedule not found.",
                 )
+            if payload.parentId is not None:
+                cursor.execute(
+                    """
+                    SELECT id
+                    FROM schedule_comments
+                    WHERE id = %s AND schedule_id = %s AND parent_id IS NULL
+                    LIMIT 1
+                    """,
+                    (payload.parentId, schedule_id),
+                )
+                if cursor.fetchone() is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail="Parent comment not found.",
+                    )
 
             cursor.execute(
                 """
@@ -1372,6 +1419,93 @@ def create_schedule_comment(schedule_id: int, payload: CommentCreateRequest):
     }
 
 
+@app.put("/api/schedules/{schedule_id}/comments/{comment_id}")
+def update_schedule_comment(
+    schedule_id: int,
+    comment_id: int,
+    payload: CommentUpdateRequest,
+):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            cursor.execute(
+                """
+                UPDATE schedule_comments
+                SET content = %s
+                WHERE id = %s AND schedule_id = %s
+                """,
+                (payload.content, comment_id, schedule_id),
+            )
+            if cursor.rowcount == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Schedule comment not found.",
+                )
+            connection.commit()
+
+            cursor.execute(
+                """
+                SELECT id, schedule_id, parent_id, author, content,
+                       like_count, dislike_count, created_at
+                FROM schedule_comments
+                WHERE id = %s AND schedule_id = %s
+                LIMIT 1
+                """,
+                (comment_id, schedule_id),
+            )
+            comment = cursor.fetchone()
+        finally:
+            cursor.close()
+            connection.close()
+    except HTTPException:
+        raise
+    except mysql.connector.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update comment.",
+        )
+
+    return {
+        "message": "Schedule comment updated.",
+        "comment": to_comment_response(comment),
+    }
+
+
+@app.delete("/api/schedules/{schedule_id}/comments/{comment_id}")
+def delete_schedule_comment(schedule_id: int, comment_id: int):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
+        try:
+            cursor.execute(
+                "DELETE FROM schedule_comments WHERE id = %s AND schedule_id = %s",
+                (comment_id, schedule_id),
+            )
+            connection.commit()
+            deleted_count = cursor.rowcount
+        finally:
+            cursor.close()
+            connection.close()
+    except mysql.connector.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete comment.",
+        )
+
+    if deleted_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Schedule comment not found.",
+        )
+
+    return {
+        "message": "Schedule comment deleted.",
+        "id": comment_id,
+        "scheduleId": schedule_id,
+    }
+
+
 @app.patch("/api/schedules/{schedule_id}/comments/{comment_id}/reactions")
 def update_schedule_comment_reactions(
     schedule_id: int,
@@ -1481,14 +1615,18 @@ def update_schedule(
     payload: ScheduleUpdateRequest,
     authorization: str | None = Header(default=None),
 ):
+    current_user = load_user_from_authorization(authorization, required=True)
     updates = payload.model_dump(exclude_unset=True)
     if not updates:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No fields to update.",
         )
-    if updates.get("notice") is True:
-        ensure_notice_permission(True, authorization)
+    if updates.get("notice") is True and current_user["role"] not in ("master", "admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only master or admin can create or update notices.",
+        )
 
     column_map = {
         "title": "title",
@@ -1509,7 +1647,7 @@ def update_schedule(
         cursor = connection.cursor(dictionary=True)
         try:
             cursor.execute(
-                "SELECT start_date, end_date FROM schedules WHERE id = %s LIMIT 1",
+                "SELECT start_date, end_date, author FROM schedules WHERE id = %s LIMIT 1",
                 (schedule_id,),
             )
             current_schedule = cursor.fetchone()
@@ -1518,6 +1656,7 @@ def update_schedule(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Schedule not found.",
                 )
+            require_schedule_manager(current_user, current_schedule["author"])
 
             next_start = updates.get("startDate", current_schedule["start_date"])
             next_end = updates.get("endDate", current_schedule["end_date"])
@@ -1553,17 +1692,33 @@ def update_schedule(
 
 
 @app.delete("/api/schedules/{schedule_id}")
-def delete_schedule(schedule_id: int):
+def delete_schedule(schedule_id: int, authorization: str | None = Header(default=None)):
+    current_user = load_user_from_authorization(authorization, required=True)
+
     try:
         connection = get_connection()
-        cursor = connection.cursor()
+        cursor = connection.cursor(dictionary=True)
         try:
+            cursor.execute(
+                "SELECT author FROM schedules WHERE id = %s LIMIT 1",
+                (schedule_id,),
+            )
+            current_schedule = cursor.fetchone()
+            if not current_schedule:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Schedule not found.",
+                )
+            require_schedule_manager(current_user, current_schedule["author"])
+
             cursor.execute("DELETE FROM schedules WHERE id = %s", (schedule_id,))
             connection.commit()
             deleted_count = cursor.rowcount
         finally:
             cursor.close()
             connection.close()
+    except HTTPException:
+        raise
     except mysql.connector.Error:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -114,7 +114,12 @@ function CommentCard({
     setLocalUserReaction(comment.userReaction || null);
   }, [comment.id, comment.content, comment.isDeleted, comment.isEdited, comment.likes, comment.dislikes, comment.userReaction, JSON.stringify(comment.replies)]);
 
-  const isAuthor = user && (user.id === comment.authorId || user.name === comment.author);
+  const isAuthor = Boolean(
+    user &&
+      (user.id === comment.authorId ||
+        user.name === comment.author ||
+        comment.author?.endsWith?.(` ${user.name}`)),
+  );
 
   const handleEditSubmit = () => {
     if (!editContent.trim()) return;
@@ -153,8 +158,6 @@ function CommentCard({
       likes: 0,
       dislikes: 0,
     };
-    setLocalReplies((prev) => [...prev, newReply]);
-
     if (onAddReply) onAddReply(comment.id, replyContent);
     setReplyContent('');
     setIsReplying(false);

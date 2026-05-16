@@ -420,6 +420,36 @@ function getReactionUpdate(currentProps, reaction) {
   return { nextProps, deltas };
 }
 
+function canManageEvent(user, event) {
+  if (!user || !event) return false;
+  if (event.extendedProps?.isMemo) return true;
+  if (user.role === 'master' || user.role === 'admin') return true;
+
+  const author = (event.extendedProps?.author || '').trim();
+  const userName = (user.name || '').trim();
+  const loginId = (user.loginId || '').trim();
+  return author === userName || author === loginId || (userName && author.endsWith(` ${userName}`));
+}
+
+function findCommentById(comments = [], commentId) {
+  for (const comment of comments) {
+    if (comment.id === commentId) return comment;
+    const reply = findCommentById(comment.replies || [], commentId);
+    if (reply) return reply;
+  }
+  return null;
+}
+
+function updateCommentById(comments = [], commentId, updater) {
+  return comments.map((comment) => {
+    if (comment.id === commentId) return updater(comment);
+    return {
+      ...comment,
+      replies: updateCommentById(comment.replies || [], commentId, updater),
+    };
+  });
+}
+
 // ── 북마크 helpers ───────────────────────────────────────────
 
 function loadBookmarks() {
@@ -983,6 +1013,10 @@ export default function Home() {
   const handleOpenEdit = (eventId) => {
     const event = events.find((e) => e.id === eventId);
     if (!event) return;
+    if (!canManageEvent(user, event)) {
+      alert('일정 작성자 또는 관리자만 수정할 수 있습니다.');
+      return;
+    }
 
     if (event.extendedProps?.isMemo) {
       let endDateStr = event.end || event.start;
@@ -1016,6 +1050,10 @@ export default function Home() {
   const handleDeleteEvent = async (eventId) => {
     const event = events.find((e) => e.id === eventId);
     if (!event) return;
+    if (!canManageEvent(user, event)) {
+      alert('일정 작성자 또는 관리자만 삭제할 수 있습니다.');
+      return;
+    }
     const isMemo = event.extendedProps?.isMemo;
     if (!window.confirm(isMemo ? '이 메모를 삭제하시겠습니까?' : '이 일정을 삭제하시겠습니까?')) return;
 
@@ -1034,8 +1072,14 @@ export default function Home() {
     handleBackToList();
 
     try {
+      const token = localStorage.getItem('token');
+      const headers = {};
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
       const response = await fetch(`${API_BASE_URL}/api/schedules/${scheduleId}`, {
         method: 'DELETE',
+        headers,
       });
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
@@ -1117,9 +1161,7 @@ export default function Home() {
 
   const handleCommentReaction = async (eventId, commentId, reaction) => {
     const currentEvent = events.find((event) => event.id === eventId);
-    const currentComment = currentEvent?.extendedProps.comments.find(
-      (comment) => comment.id === commentId,
-    );
+    const currentComment = findCommentById(currentEvent?.extendedProps.comments || [], commentId);
     if (!currentEvent || !currentComment) return;
 
     const { nextProps: nextComment, deltas } = getReactionUpdate(currentComment, reaction);
@@ -1127,8 +1169,10 @@ export default function Home() {
     setEvents((prev) =>
       prev.map((event) => {
         if (event.id !== eventId) return event;
-        const comments = event.extendedProps.comments.map((comment) =>
-          comment.id === commentId ? nextComment : comment,
+        const comments = updateCommentById(
+          event.extendedProps.comments,
+          commentId,
+          () => nextComment,
         );
         return { ...event, extendedProps: { ...event.extendedProps, comments } };
       }),
@@ -1152,14 +1196,14 @@ export default function Home() {
       setEvents((prev) =>
         prev.map((event) => {
           if (event.id !== eventId) return event;
-          const comments = event.extendedProps.comments.map((comment) =>
-            comment.id === commentId
-              ? {
-                  ...comment,
-                  likes: data.likes ?? comment.likes,
-                  dislikes: data.dislikes ?? comment.dislikes,
-                }
-              : comment,
+          const comments = updateCommentById(
+            event.extendedProps.comments,
+            commentId,
+            (comment) => ({
+              ...comment,
+              likes: data.likes ?? comment.likes,
+              dislikes: data.dislikes ?? comment.dislikes,
+            }),
           );
           return { ...event, extendedProps: { ...event.extendedProps, comments } };
         }),
@@ -1168,8 +1212,10 @@ export default function Home() {
       setEvents((prev) =>
         prev.map((event) => {
           if (event.id !== eventId) return event;
-          const comments = event.extendedProps.comments.map((comment) =>
-            comment.id === commentId ? currentComment : comment,
+          const comments = updateCommentById(
+            event.extendedProps.comments,
+            commentId,
+            () => currentComment,
           );
           return { ...event, extendedProps: { ...event.extendedProps, comments } };
         }),
@@ -1205,6 +1251,85 @@ export default function Home() {
       await loadSchedules({ silent: true });
     } catch (error) {
       alert(error.message);
+    }
+  };
+
+  const handleAddReply = async (eventId, parentId, content) => {
+    const currentEvent = events.find((event) => event.id === eventId);
+    if (!currentEvent) return;
+
+    const authorName = user?.repBadge ? `${user.repBadge} ${user.name}` : (user?.name ?? 'unknown');
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/schedules/${currentEvent.extendedProps.scheduleId}/comments`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            author: authorName,
+            content,
+            parentId,
+          }),
+        },
+      );
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.detail || data.message || '대댓글을 저장하지 못했습니다.');
+      }
+
+      await loadSchedules({ silent: true });
+    } catch (error) {
+      alert(error.message);
+    }
+  };
+
+  const handleEditComment = async (eventId, commentId, content) => {
+    const currentEvent = events.find((event) => event.id === eventId);
+    if (!currentEvent) return;
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/schedules/${currentEvent.extendedProps.scheduleId}/comments/${commentId}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content }),
+        },
+      );
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.detail || data.message || '댓글을 수정하지 못했습니다.');
+      }
+
+      await loadSchedules({ silent: true });
+    } catch (error) {
+      alert(error.message);
+      await loadSchedules({ silent: true });
+    }
+  };
+
+  const handleDeleteComment = async (eventId, commentId) => {
+    const currentEvent = events.find((event) => event.id === eventId);
+    if (!currentEvent) return;
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/schedules/${currentEvent.extendedProps.scheduleId}/comments/${commentId}`,
+        { method: 'DELETE' },
+      );
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.detail || data.message || '댓글을 삭제하지 못했습니다.');
+      }
+
+      await loadSchedules({ silent: true });
+    } catch (error) {
+      alert(error.message);
+      await loadSchedules({ silent: true });
     }
   };
 
@@ -1311,7 +1436,11 @@ export default function Home() {
             eventCursor="pointer"
             height="auto"
             dayMaxEvents={false}
-            datesSet={(arg) => setViewRange({ start: arg.start, end: arg.end })}
+            datesSet={(info) => {
+              setViewRange({ start: info.start, end: info.end });
+              const today = getTodayStr();
+              setViewingToday(today >= info.startStr.slice(0, 10) && today < info.endStr.slice(0, 10));
+            }}
             eventOrder={(a, b) => {
               const priority = (e) => {
                 if (e.extendedProps?.notice || e.title?.startsWith?.('[공지]')) return 0;
@@ -1394,14 +1523,10 @@ export default function Home() {
               right: 'dayGridMonth,dayGridWeek filterBtn',
             }}
             buttonText={{ month: '월별', week: '주별' }}
-            datesSet={(info) => {
-              const today = getTodayStr();
-              setViewingToday(today >= info.startStr.slice(0, 10) && today < info.endStr.slice(0, 10));
-            }}
             dayHeaderContent={(arg) => {
               if (arg.view.type === 'dayGridWeek') {
                 const d = arg.date;
-                return `${d.getDate()}일(${DAY_NAMES[d.getDay()]})`;
+                return `${d.getDate()}일 (${DAY_NAMES[d.getDay()]})`;
               }
               return arg.text;
             }}
@@ -1515,8 +1640,20 @@ export default function Home() {
                 handleCommentReaction(detailEventId, commentId, reaction)
               }
               onAddComment={(content) => handleAddComment(detailEventId, content)}
-              onEdit={user ? () => handleOpenEdit(detailEventId) : undefined}
-              onDelete={user ? () => handleDeleteEvent(detailEventId) : undefined}
+              onEditComment={(commentId, content) =>
+                handleEditComment(detailEventId, commentId, content)
+              }
+              onDeleteComment={(commentId) => handleDeleteComment(detailEventId, commentId)}
+              onAddReply={(parentId, content) => handleAddReply(detailEventId, parentId, content)}
+              onEditReply={(_, replyId, content) =>
+                handleEditComment(detailEventId, replyId, content)
+              }
+              onDeleteReply={(_, replyId) => handleDeleteComment(detailEventId, replyId)}
+              onReplyReact={(_, replyId, reaction) =>
+                handleCommentReaction(detailEventId, replyId, reaction)
+              }
+              onEdit={canManageEvent(user, detailEvent) ? () => handleOpenEdit(detailEventId) : undefined}
+              onDelete={canManageEvent(user, detailEvent) ? () => handleDeleteEvent(detailEventId) : undefined}
               isBookmarked={bookmarkedIds.has(detailEventId)}
               onBookmark={() => handleToggleBookmark(detailEventId)}
               highlightedCommentId={searchParams.get('commentId')}
