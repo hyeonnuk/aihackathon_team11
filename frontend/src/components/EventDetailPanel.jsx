@@ -4,6 +4,7 @@
 // ============================================================
 
 import { useState } from 'react';
+import { TAG_CHIP_COLORS } from '../constants/tagColors';
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -221,7 +222,7 @@ export default function EventDetailPanel({
 
         {/* 설명 */}
         {ep.photo && (
-          <div className="overflow-hidden rounded-xl border border-gray-100 bg-white">
+          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
             <img
               src={ep.photo}
               alt={event.title}
@@ -230,7 +231,7 @@ export default function EventDetailPanel({
           </div>
         )}
 
-        <div className="bg-white rounded-xl p-4 border border-gray-100">
+        <div className="bg-white rounded-xl p-4 border border-gray-200">
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">설명</p>
           <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap break-words">
             {ep.description}
@@ -243,10 +244,7 @@ export default function EventDetailPanel({
             <span
               key={tag}
               className="px-2.5 py-1 text-xs font-semibold rounded-full"
-              style={{
-                backgroundColor: event.backgroundColor + '22',
-                color: event.backgroundColor,
-              }}
+              style={{ backgroundColor: '#ffffff', border: `1px solid ${TAG_CHIP_COLORS[tag] ?? event.backgroundColor}`, color: TAG_CHIP_COLORS[tag] ?? event.backgroundColor }}
             >
               #{tag}
             </span>

@@ -1,131 +1,185 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+// ============================================================
+//  pages/Home.jsx — 경로: /
+//  개인화 캘린더 대시보드
+//  좌측(70%): FullCalendar — 날짜/이벤트 클릭 + 학년/태그 필터
+//  우측(30%): Daily Agenda — 목록(list) ↔ 상세(detail) 전환
+// ============================================================
+
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../App.css';
-import EventAddModal from '../components/EventAddModal';
+import EventAddModal    from '../components/EventAddModal';
 import EventDetailPanel from '../components/EventDetailPanel';
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
+import { TAG_COLORS, TAG_TEXT_COLORS, TAG_CHIP_COLORS, getTagColor } from '../constants/tagColors';
+import FullCalendar     from '@fullcalendar/react';
+import dayGridPlugin    from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+// ── Helpers ───────────────────────────────────────────────────
+function getTodayStr() {
+  const now = new Date();
+  return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
+}
 
 const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
-const ALL_GRADES = ['1학년', '2학년', '3학년', '4학년'];
-const ALL_TAGS = ['공모전', '해커톤', '스터디', '프로젝트', '장학/취업'];
-const EVENT_COLORS = ['#818cf8', '#fb7185', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa', '#f472b6'];
+function formatDateLabel(dateStr) {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const d = new Date(year, month - 1, day);
+  return `${month}월 ${day}일 (${DAY_NAMES[d.getDay()]})`;
+}
 
+function formatNow() {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')} ${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
+}
+
+function getDeadlineBadge(applyEndDate) {
+  if (!applyEndDate) return null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const end   = new Date(applyEndDate + 'T23:59:59');
+  const diff  = Math.ceil((end - today) / 86_400_000);
+  if (diff < 0)  return 'closed';
+  if (diff <= 3) return 'imminent';
+  return null;
+}
+
+function getStoredUser() {
+  try { return JSON.parse(localStorage.getItem('user') ?? 'null'); }
+  catch { return null; }
+}
+
+// ── 필터 상수 ─────────────────────────────────────────────────
+const ALL_GRADES = ['1학년', '2학년', '3학년', '4학년'];
+const ALL_TAGS   = ['공모전', '해커톤', '스터디', '프로젝트', '장학/취업'];
+
+
+// ── 이벤트 초기 데이터 ─────────────────────────────────────────
+// extendedProps 에 grade, tags, description, applyPeriod, applyEndDate,
+// author, applyLink, likes, dislikes, userReaction, comments 포함
+// EVENTS_DATA의 backgroundColor/borderColor는 아래 EVENTS에서 태그 기반으로 자동 적용됨
 const EVENTS_DATA = [
   {
-    id: 'detail-1',
+    id: '1',
     title: '교내 웹 해커톤',
     start: '2026-05-20',
     end: '2026-05-23',
-    backgroundColor: '#818cf8',
-    borderColor: '#818cf8',
     extendedProps: {
       grade: ['2학년', '3학년', '4학년'],
       tags: ['해커톤', '프로젝트'],
-      description:
-        '교내 학생들이 팀을 이루어 웹 서비스를 개발하는 해커톤입니다.\n최대 5명 팀으로 구성하여 24시간 동안 개발 및 발표를 진행합니다.',
-      applyPeriod: '2026-05-01 ~ 2026-05-18',
+      description: '교내 학생들이 팀을 이루어 웹 서비스를 개발하는 해커톤입니다.\n최대 5명 팀으로 구성하여 24시간 동안 개발 후 발표를 진행합니다.\n우수 팀에게는 장학금 및 수료증이 수여됩니다.',
+      applyPeriod:  '2026-05-01 ~ 2026-05-18',
       applyEndDate: '2026-05-18',
-      author: '관리자',
+      author:   '권이은',
       applyLink: 'https://example.com/hackathon',
-      likes: 12,
-      dislikes: 2,
-      userReaction: null,
+      likes: 12, dislikes: 2, userReaction: null,
       comments: [
-        {
-          id: 1,
-          author: '김학생',
-          content: '백엔드 가능한 팀원 구합니다.',
-          createdAt: '2026-05-16 14:30',
-          likes: 3,
-          dislikes: 0,
-          userReaction: null,
-        },
+        { id: 1, author: '가천이',   content: '팀원 구해요! 백엔드 할 수 있는 분 댓글 남겨주세요.', createdAt: '2026-05-16 14:30', likes: 3, dislikes: 0, userReaction: null },
+        { id: 2, author: '컴소학생', content: '작년에 참가했는데 정말 좋았어요! 이번에도 도전!',      createdAt: '2026-05-17 09:15', likes: 5, dislikes: 1, userReaction: null },
       ],
     },
   },
   {
-    id: 'detail-2',
+    id: '2',
     title: '기말 프로젝트 발표',
     start: '2026-05-25',
     end: '2026-05-27',
-    backgroundColor: '#fb7185',
-    borderColor: '#fb7185',
     extendedProps: {
       grade: ['1학년', '2학년', '3학년', '4학년'],
       tags: ['프로젝트'],
-      description: '소프트웨어공학 기말 프로젝트 발표 일정입니다. PPT 및 데모 준비가 필요합니다.',
-      applyPeriod: '2026-05-05 ~ 2026-05-24',
+      description: '소프트웨어공학 기말 프로젝트 발표입니다.\nPPT 및 데모 준비 필요. 발표 시간은 팀당 15분입니다.',
+      applyPeriod:  '2026-05-05 ~ 2026-05-24',
       applyEndDate: '2026-05-24',
-      author: '김교수',
+      author:   '홍길동',
       applyLink: null,
-      likes: 8,
-      dislikes: 1,
-      userReaction: null,
-      comments: [],
+      likes: 8, dislikes: 1, userReaction: null,
+      comments: [
+        { id: 1, author: '이영희', content: '발표 장소가 어디인가요?', createdAt: '2026-05-18 11:00', likes: 1, dislikes: 0, userReaction: null },
+      ],
     },
   },
   {
-    id: 'detail-3',
+    id: '3',
     title: '카카오 코딩테스트',
     start: '2026-05-28',
-    backgroundColor: '#fbbf24',
-    borderColor: '#fbbf24',
     extendedProps: {
       grade: ['3학년', '4학년'],
       tags: ['장학/취업'],
-      description: '카카오 2026 하반기 공채 코딩테스트입니다. 온라인으로 진행됩니다.',
-      applyPeriod: '2026-04-20 ~ 2026-05-13',
-      applyEndDate: '2026-05-13',
-      author: '취업지원팀',
+      description: '카카오 2026 하반기 공채 코딩테스트입니다.\n온라인으로 진행됩니다.',
+      applyPeriod:  '2026-04-20 ~ 2026-05-13',
+      applyEndDate: '2026-05-13',   // 마감된 일정
+      author:   '박지수',
       applyLink: 'https://careers.kakao.com',
-      likes: 20,
-      dislikes: 0,
-      userReaction: null,
+      likes: 20, dislikes: 0, userReaction: null,
       comments: [],
     },
   },
   {
-    id: 'detail-4',
+    id: '4',
     title: '알고리즘 스터디',
     start: '2026-06-03',
-    backgroundColor: '#34d399',
-    borderColor: '#34d399',
     extendedProps: {
       grade: ['1학년', '2학년', '3학년', '4학년'],
       tags: ['스터디'],
-      description: '매주 화요일 알고리즘 스터디. 이번 주 주제는 다이나믹 프로그래밍입니다.',
-      applyPeriod: null,
+      description: '매주 화요일 알고리즘 스터디. 이번 주 주제: 다이나믹 프로그래밍.',
+      applyPeriod:  null,
       applyEndDate: null,
-      author: '최민준',
+      author:   '최민준',
       applyLink: null,
-      likes: 7,
-      dislikes: 0,
-      userReaction: null,
+      likes: 7, dislikes: 0, userReaction: null,
+      comments: [
+        { id: 1, author: '정수현', content: 'DP 어렵지만 열심히 공부해요!', createdAt: '2026-05-30 20:00', likes: 2, dislikes: 0, userReaction: null },
+      ],
+    },
+  },
+  {
+    id: '5',
+    title: 'Google ML Bootcamp',
+    start: '2026-06-05',
+    end: '2026-06-08',
+    extendedProps: {
+      grade: ['2학년', '3학년', '4학년'],
+      tags: ['공모전', '프로젝트'],
+      description: 'Google 머신러닝 부트캠프입니다.\n사전 과제 제출 후 참가 가능합니다.\n선발된 참가자에게는 교통비 및 숙박비가 지원됩니다.',
+      applyPeriod:  '2026-05-01 ~ 2026-05-31',
+      applyEndDate: '2026-05-31',
+      author:   '김철수',
+      applyLink: 'https://developers.google.com/ml-bootcamp',
+      likes: 35, dislikes: 3, userReaction: null,
+      comments: [
+        { id: 1, author: '박민영', content: '사전 과제가 있나요? 난이도는 어떤가요?',                                      createdAt: '2026-05-10 15:30', likes: 4, dislikes: 0, userReaction: null },
+        { id: 2, author: '운영자', content: '사전 과제는 기초 ML 코드 작성 과제입니다. 파이썬 기본기가 있으면 충분합니다!', createdAt: '2026-05-11 10:00', likes: 8, dislikes: 0, userReaction: null },
+      ],
+    },
+  },
+  {
+    id: '6',
+    title: '장학금 신청 마감',
+    start: '2026-05-31',
+    extendedProps: {
+      grade: ['1학년', '2학년', '3학년', '4학년'],
+      tags: ['장학/취업'],
+      description: '2026년 1학기 성적 장학금 신청 마감일입니다.\n포털에서 신청 가능합니다.',
+      applyPeriod:  '2026-05-12 ~ 2026-05-16',
+      applyEndDate: '2026-05-16',   // 마감 임박(당일)
+      author:   '학생처',
+      applyLink: null,
+      likes: 5, dislikes: 0, userReaction: null,
       comments: [],
     },
   },
   {
-    id: 'detail-5',
-    title: 'Google ML Bootcamp',
-    start: '2026-06-05',
-    end: '2026-06-08',
-    backgroundColor: '#60a5fa',
-    borderColor: '#60a5fa',
+    id: '7',
+    title: '앱 공모전 접수 마감',
+    start: '2026-06-10',
     extendedProps: {
-      grade: ['2학년', '3학년', '4학년'],
-      tags: ['공모전', '프로젝트'],
-      description: 'Google 머신러닝 부트캠프입니다. 사전 과제 제출 후 참가 가능합니다.',
-      applyPeriod: '2026-05-01 ~ 2026-05-31',
-      applyEndDate: '2026-05-31',
-      author: '운영진',
-      applyLink: 'https://developers.google.com/ml-bootcamp',
-      likes: 35,
-      dislikes: 3,
-      userReaction: null,
+      grade: ['1학년', '2학년', '3학년'],
+      tags: ['공모전'],
+      description: '전국 대학생 앱 개발 공모전 접수 마감입니다.\n개인/팀 모두 가능합니다.',
+      applyPeriod:  '2026-05-01 ~ 2026-06-08',
+      applyEndDate: '2026-06-08',
+      author:   '이나라',
+      applyLink: 'https://example.com/app-contest',
+      likes: 15, dislikes: 1, userReaction: null,
       comments: [],
     },
   },
@@ -235,109 +289,22 @@ function scheduleToEvent(schedule, index) {
   };
 }
 
-function getFilteredEvents(events, selectedGrades, selectedTags, showNoticeOnly) {
-  return events.filter(({ extendedProps: { grade, tags, notice } }) => {
-    if (showNoticeOnly && !notice) return false;
+function getFilteredEvents(events, selectedGrades, selectedTags) {
+  if (selectedGrades.length === 0 && selectedTags.length === 0) return events;
+  return events.filter(({ extendedProps: { grade, tags } }) => {
     const gradeOk = selectedGrades.length === 0 || selectedGrades.some((g) => grade.includes(g));
-    const tagOk = selectedTags.length === 0 || selectedTags.some((t) => tags.includes(t));
+    const tagOk   = selectedTags.length   === 0 || selectedTags.some((t)   => tags.includes(t));
     return gradeOk && tagOk;
   });
 }
 
 function getEventsForDate(events, dateStr) {
-  return events.filter((event) => {
-    const start = getDatePart(event.start);
-    const end = getDatePart(event.end);
-    if (!start) return false;
-    if (!end || start === end) return start === dateStr;
-    return dateStr >= start && dateStr < end;
-  });
+  return events.filter((ev) =>
+    ev.end ? dateStr >= ev.start && dateStr < ev.end : dateStr === ev.start
+  );
 }
 
-function getDeadlineBadge(applyEndDate) {
-  if (!applyEndDate) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const end = new Date(`${applyEndDate}T23:59:59`);
-  const diff = Math.ceil((end - today) / 86_400_000);
-  if (diff < 0) return 'closed';
-  if (diff <= 3) return 'imminent';
-  return null;
-}
-
-function buildEditInitialData(event) {
-  const ep = event.extendedProps;
-
-  let gradeValue = 'all';
-  if (ep.grade && ep.grade.length > 0 && ep.grade.length < ALL_GRADES.length) {
-    gradeValue = ep.grade[0].replace('학년', '');
-  }
-
-  let endDateStr = '';
-  if (event.end) {
-    const d = new Date(`${event.end}T00:00:00`);
-    d.setDate(d.getDate() - 1);
-    endDateStr = [
-      d.getFullYear(),
-      String(d.getMonth() + 1).padStart(2, '0'),
-      String(d.getDate()).padStart(2, '0'),
-    ].join('-');
-  }
-
-  const title = event.title.replace(/^\[공지\] /, '');
-
-  return {
-    scheduleId: ep.scheduleId,
-    title,
-    startDate: event.start ? `${event.start}T00:00` : '',
-    endDate: endDateStr ? `${endDateStr}T00:00` : '',
-    content: ep.description || '',
-    photo: ep.photo || null,
-    link: ep.applyLink || '',
-    note: ep.note || '',
-    grade: gradeValue,
-    notice: Boolean(ep.notice),
-    hashtags: ep.tags || [],
-    author: ep.author || '',
-  };
-}
-
-function getReactionUpdate(currentProps, reaction) {
-  const nextProps = { ...currentProps };
-  const deltas = { likeDelta: 0, dislikeDelta: 0 };
-
-  if (nextProps.userReaction === reaction) {
-    if (reaction === 'like') {
-      nextProps.likes = Math.max(nextProps.likes - 1, 0);
-      deltas.likeDelta = -1;
-    } else {
-      nextProps.dislikes = Math.max(nextProps.dislikes - 1, 0);
-      deltas.dislikeDelta = -1;
-    }
-    nextProps.userReaction = null;
-  } else {
-    if (nextProps.userReaction === 'like') {
-      nextProps.likes = Math.max(nextProps.likes - 1, 0);
-      deltas.likeDelta = -1;
-    }
-    if (nextProps.userReaction === 'dislike') {
-      nextProps.dislikes = Math.max(nextProps.dislikes - 1, 0);
-      deltas.dislikeDelta = -1;
-    }
-
-    if (reaction === 'like') {
-      nextProps.likes += 1;
-      deltas.likeDelta += 1;
-    } else {
-      nextProps.dislikes += 1;
-      deltas.dislikeDelta += 1;
-    }
-    nextProps.userReaction = reaction;
-  }
-
-  return { nextProps, deltas };
-}
-
+// ── AgendaCard ────────────────────────────────────────────────
 function AgendaCard({ event, isLast, onDetail }) {
   const { description, tags, applyEndDate, author } = event.extendedProps;
   const badge = getDeadlineBadge(applyEndDate);
@@ -345,126 +312,113 @@ function AgendaCard({ event, isLast, onDetail }) {
   return (
     <div>
       <button
-        className="group flex w-full gap-3 rounded-lg py-4 text-left transition-colors hover:bg-indigo-50/60"
+        className="w-full text-left py-4 flex gap-3 items-stretch hover:bg-primary-50/60 transition-colors rounded-lg group"
         onClick={onDetail}
       >
-        <div className="w-1 shrink-0 rounded-full self-stretch" style={{ backgroundColor: event.backgroundColor }} />
-        <div className="min-w-0 flex-1">
-          <div className="mb-0.5 flex flex-wrap items-center gap-1.5">
-            <p className="text-sm font-semibold leading-snug text-gray-800">{event.title}</p>
+        {/* 색상 인디케이터 */}
+        <div className="w-1 rounded-full shrink-0 self-stretch" style={{ backgroundColor: event.backgroundColor }} />
+
+        <div className="flex-1 min-w-0">
+          {/* 제목 + 뱃지 */}
+          <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+            <p className="text-sm font-semibold text-gray-800 leading-snug">{event.title}</p>
             {badge === 'closed' && (
-              <span className="rounded-full bg-gray-200 px-1.5 py-0.5 text-[10px] font-bold text-gray-500">
-                마감
-              </span>
+              <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-gray-200 text-gray-500">마감</span>
             )}
             {badge === 'imminent' && (
-              <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-600">
-                마감 임박
-              </span>
+              <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-red-100 text-red-600">마감 임박</span>
             )}
           </div>
+
+          {/* 설명 요약 */}
           {description && (
-            <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-gray-400">
+            <p className="text-xs text-gray-400 mt-0.5 leading-relaxed line-clamp-2">
               {description.replace(/\n/g, ' ')}
             </p>
           )}
-          {author && <p className="mt-1 text-xs text-gray-400">작성자 {author}</p>}
-          <div className="mt-2 flex flex-wrap gap-1">
+
+          {/* 작성자 */}
+          {author && <p className="text-xs text-gray-400 mt-1">👤 {author}</p>}
+
+          {/* 태그 칩 */}
+          <div className="flex flex-wrap gap-1 mt-2">
             {tags.map((tag) => (
               <span
                 key={tag}
-                className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-                style={{ backgroundColor: event.backgroundColor + '22', color: event.backgroundColor }}
+                className="px-2 py-0.5 text-[10px] font-medium rounded-full"
+                style={{ backgroundColor: '#ffffff', border: `1px solid ${TAG_CHIP_COLORS[tag] ?? event.backgroundColor}`, color: TAG_CHIP_COLORS[tag] ?? event.backgroundColor }}
               >
                 #{tag}
               </span>
             ))}
           </div>
         </div>
-        <div className="flex shrink-0 items-center text-gray-300 transition-colors group-hover:text-indigo-400">
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+
+        {/* 화살표 */}
+        <div className="flex items-center text-[#D3D6DE] group-hover:text-primary-400 shrink-0 transition-colors">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </div>
       </button>
+
       {!isLast && <div className="h-px bg-gray-100" />}
     </div>
   );
 }
 
-function CalendarFilterPopup({ selectedGrades, selectedTags, showNoticeOnly, onGradeChange, onTagChange, onNoticeChange, onClose }) {
+function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTagChange, onClose }) {
   return (
     <div
-      className="calendar-filter-popup absolute z-50 rounded-2xl border border-gray-100 bg-white p-5 shadow-xl"
+      className="calendar-filter-popup absolute z-50 bg-white rounded-2xl shadow-xl border border-gray-100 p-5"
       style={{ top: '62px', right: '8px', width: '288px', maxWidth: 'calc(100vw - 24px)' }}
     >
-      <div className="mb-1 flex items-center justify-between">
+      <div className="flex items-center justify-between mb-1">
         <h3 className="text-sm font-bold text-gray-800">캘린더 필터</h3>
         <button
           onClick={onClose}
-          className="flex h-7 w-7 items-center justify-center rounded-full text-lg leading-none text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
-        >
-          x
-        </button>
+          className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors text-lg leading-none"
+        >×</button>
       </div>
       <p className="mb-4 text-xs text-gray-400">표시할 캘린더를 선택하세요.</p>
 
+      {/* 학년 필터 */}
       <div className="mb-4">
-        <p className="mb-2.5 text-[10px] font-bold uppercase tracking-widest text-indigo-600">공지</p>
-        <button
-          onClick={() => onNoticeChange((prev) => !prev)}
-          className={`rounded-full border px-3 py-1 text-xs font-semibold transition-all active:scale-95 ${
-            showNoticeOnly
-              ? 'border-red-500 bg-red-500 text-white shadow-sm'
-              : 'border-gray-300 bg-white text-gray-600 hover:border-red-400 hover:text-red-500'
-          }`}
-        >
-          공지만 보기
-        </button>
-      </div>
-
-      <div className="mb-4 h-px bg-gray-100" />
-
-      <div className="mb-4">
-        <p className="mb-2.5 text-[10px] font-bold uppercase tracking-widest text-indigo-600">학년</p>
+        <p className="text-[10px] font-bold text-primary-500 uppercase tracking-widest mb-2.5">학년</p>
         <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
-          <label className="flex cursor-pointer select-none items-center gap-2">
-            <input
-              type="checkbox"
-              checked={selectedGrades.length === 0}
-              onChange={() => onGradeChange([])}
-              className="h-4 w-4 accent-indigo-600"
-            />
-            <span className="text-sm text-gray-600">전체</span>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" checked={selectedGrades.length === 0} onChange={() => onGradeChange([])} className="w-4 h-4 accent-primary-500" />
+            <span className="text-sm text-[#383642]">전체</span>
           </label>
           {ALL_GRADES.map((grade) => (
-            <label key={grade} className="flex cursor-pointer select-none items-center gap-2">
+            <label key={grade} className="flex items-center gap-2 cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={selectedGrades.includes(grade)}
                 onChange={() =>
                   onGradeChange((prev) => {
-                    const next = prev.includes(grade)
-                      ? prev.filter((g) => g !== grade)
-                      : [...prev, grade];
+                    const next = prev.includes(grade) ? prev.filter((g) => g !== grade) : [...prev, grade];
                     return next.length === ALL_GRADES.length ? [] : next;
                   })
                 }
-                className="h-4 w-4 accent-indigo-600"
+                className="w-4 h-4 accent-primary-500"
               />
-              <span className="text-sm text-gray-600">{grade}</span>
+              <span className="text-sm text-[#383642]">{grade}</span>
             </label>
           ))}
         </div>
       </div>
 
-      <div className="mb-4 h-px bg-gray-100" />
+      <div className="h-px bg-gray-100 mb-4" />
 
+      {/* 태그 필터 — 태그별 고유 색상 */}
       <div>
-        <p className="mb-2.5 text-[10px] font-bold uppercase tracking-widest text-indigo-600">태그</p>
+        <p className="text-[10px] font-bold text-primary-500 uppercase tracking-widest mb-2.5">태그</p>
         <div className="flex flex-wrap gap-2">
           {ALL_TAGS.map((tag) => {
             const isSelected = selectedTags.includes(tag);
+            const tagBg   = TAG_COLORS[tag] ?? '#ACB1BE';
+            const tagText = TAG_TEXT_COLORS[tag] ?? '#383642';
             return (
               <button
                 key={tag}
@@ -473,13 +427,13 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, showNoticeOnly, onG
                     prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
                   )
                 }
-                className={`rounded-full border px-3 py-1 text-xs font-semibold transition-all active:scale-95 ${
-                  isSelected
-                    ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
-                    : 'border-gray-300 bg-white text-gray-600 hover:border-indigo-400 hover:text-indigo-600'
-                }`}
+                className="px-3 py-1 text-xs font-semibold rounded-full border transition-all active:scale-95"
+                style={isSelected
+                  ? { backgroundColor: tagBg, color: tagText, borderColor: tagBg }
+                  : { backgroundColor: 'white', color: '#ACB1BE', borderColor: '#D3D6DE' }
+                }
               >
-                {tag}
+                #{tag}
               </button>
             );
           })}
@@ -491,7 +445,6 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, showNoticeOnly, onG
           onClick={() => {
             onGradeChange([]);
             onTagChange([]);
-            onNoticeChange(false);
           }}
           className="mt-4 w-full rounded-lg border border-indigo-200 py-2 text-xs font-semibold text-indigo-600 transition-all hover:bg-indigo-50 hover:text-indigo-800"
         >
@@ -502,25 +455,23 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, showNoticeOnly, onG
   );
 }
 
+// ── Home (main) ───────────────────────────────────────────────
 export default function Home() {
   const navigate = useNavigate();
-  const calendarRef = useRef(null);
 
-  const [user, setUser] = useState(getStoredUser);
-  const [selectedDate, setSelectedDate] = useState(getTodayStr);
+  // ── 기존 상태 ──────────────────────────────────────────────
+  const [user, setUser]                     = useState(getStoredUser);
+  const [selectedDate, setSelectedDate]     = useState(getTodayStr);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isFilterOpen, setIsFilterOpen]     = useState(false);
   const [selectedGrades, setSelectedGrades] = useState([]);
   const [selectedTags, setSelectedTags] = useState([]);
-  const [showNoticeOnly, setShowNoticeOnly] = useState(false);
   const [events, setEvents] = useState([]);
   const [scheduleError, setScheduleError] = useState('');
   const [panelView, setPanelView] = useState('list');
   const [detailEventId, setDetailEventId] = useState(null);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editTargetEvent, setEditTargetEvent] = useState(null);
 
-  const hasActiveFilters = selectedGrades.length > 0 || selectedTags.length > 0 || showNoticeOnly;
+  const hasActiveFilters = selectedGrades.length > 0 || selectedTags.length > 0;
 
   const loadSchedules = async () => {
     setScheduleError('');
@@ -545,10 +496,10 @@ export default function Home() {
 
   useEffect(() => {
     if (!isFilterOpen) return;
-    const handler = (event) => {
+    const handler = (e) => {
       const popup = document.querySelector('.calendar-filter-popup');
-      const button = document.querySelector('.fc-filterBtn-button');
-      if (popup && !popup.contains(event.target) && (!button || !button.contains(event.target))) {
+      const btn   = document.querySelector('.fc-filterBtn-button');
+      if (popup && !popup.contains(e.target) && (!btn || !btn.contains(e.target))) {
         setIsFilterOpen(false);
       }
     };
@@ -557,8 +508,8 @@ export default function Home() {
   }, [isFilterOpen]);
 
   const filteredCalendarEvents = useMemo(
-    () => getFilteredEvents(events, selectedGrades, selectedTags, showNoticeOnly),
-    [events, selectedGrades, selectedTags, showNoticeOnly],
+    () => getFilteredEvents(events, selectedGrades, selectedTags),
+    [events, selectedGrades, selectedTags],
   );
   const agendaEvents = useMemo(
     () => getEventsForDate(filteredCalendarEvents, selectedDate),
@@ -581,206 +532,105 @@ export default function Home() {
     setDetailEventId(null);
   };
 
+  // 캘린더 이벤트 바 클릭 → 해당 일정 상세로 바로 이동
   const handleCalendarEventClick = ({ event }) => {
     setSelectedDate(event.startStr.slice(0, 10));
     setDetailEventId(event.id);
     setPanelView('detail');
   };
 
+  // AgendaCard 클릭 → 상세 뷰
   const handleShowDetail = (eventId) => {
     setDetailEventId(eventId);
     setPanelView('detail');
   };
 
+  // 상세 → 목록
   const handleBackToList = () => {
     setPanelView('list');
     setDetailEventId(null);
   };
 
-  const handleOpenEdit = (eventId) => {
-    const event = events.find((e) => e.id === eventId);
-    if (!event) return;
-    setEditTargetEvent(event);
-    setIsEditModalOpen(true);
-  };
-
-  const handleDeleteEvent = async (eventId) => {
-    const event = events.find((e) => e.id === eventId);
-    if (!event) return;
-    if (!window.confirm('이 일정을 삭제하시겠습니까?')) return;
-
-    const scheduleId = event.extendedProps.scheduleId;
-
-    setEvents((prev) => prev.filter((e) => e.id !== eventId));
-    handleBackToList();
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/schedules/${scheduleId}`, {
-        method: 'DELETE',
-      });
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.detail || data.message || '삭제에 실패했습니다.');
-      }
-    } catch (error) {
-      setEvents((prev) => {
-        const stillAbsent = !prev.find((e) => e.id === eventId);
-        return stillAbsent ? [...prev, event] : prev;
-      });
-      alert(`일정 삭제 실패\n${error.message}`);
-    }
-  };
-
-  const handleEventReaction = async (eventId, reaction) => {
-    const currentEvent = events.find((event) => event.id === eventId);
-    if (!currentEvent) return;
-
-    const { nextProps, deltas } = getReactionUpdate(currentEvent.extendedProps, reaction);
-
-    setEvents((prev) =>
-      prev.map((event) =>
-        event.id === eventId ? { ...event, extendedProps: nextProps } : event,
-      ),
+  // ── 일정 좋아요/싫어요 ─────────────────────────────────────
+  const handleEventReaction = (eventId, reaction) => {
+    setEventsBase((prev) =>
+      prev.map((ev) => {
+        if (ev.id !== eventId) return ev;
+        const ep = { ...ev.extendedProps };
+        if (ep.userReaction === reaction) {
+          reaction === 'like' ? ep.likes-- : ep.dislikes--;
+          ep.userReaction = null;
+        } else {
+          if (ep.userReaction === 'like')    ep.likes--;
+          if (ep.userReaction === 'dislike') ep.dislikes--;
+          reaction === 'like' ? ep.likes++ : ep.dislikes++;
+          ep.userReaction = reaction;
+        }
+        return { ...ev, extendedProps: ep };
+      })
     );
-
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/schedules/${currentEvent.extendedProps.scheduleId}/reactions`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(deltas),
-        },
-      );
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(data.detail || data.message || '반응을 저장하지 못했습니다.');
-      }
-
-      setEvents((prev) =>
-        prev.map((event) =>
-          event.id === eventId
-            ? {
-                ...event,
-                extendedProps: {
-                  ...event.extendedProps,
-                  likes: data.likeCount ?? event.extendedProps.likes,
-                  dislikes: data.dislikeCount ?? event.extendedProps.dislikes,
-                },
-              }
-            : event,
-        ),
-      );
-    } catch (error) {
-      setEvents((prev) =>
-        prev.map((event) =>
-          event.id === eventId ? { ...event, extendedProps: currentEvent.extendedProps } : event,
-        ),
-      );
-      alert(error.message);
-    }
   };
 
-  const handleCommentReaction = async (eventId, commentId, reaction) => {
-    const currentEvent = events.find((event) => event.id === eventId);
-    const currentComment = currentEvent?.extendedProps.comments.find(
-      (comment) => comment.id === commentId,
+  // ── 댓글 좋아요/싫어요 ─────────────────────────────────────
+  const handleCommentReaction = (eventId, commentId, reaction) => {
+    setEventsBase((prev) =>
+      prev.map((ev) => {
+        if (ev.id !== eventId) return ev;
+        const comments = ev.extendedProps.comments.map((c) => {
+          if (c.id !== commentId) return c;
+          const u = { ...c };
+          if (u.userReaction === reaction) {
+            reaction === 'like' ? u.likes-- : u.dislikes--;
+            u.userReaction = null;
+          } else {
+            if (u.userReaction === 'like')    u.likes--;
+            if (u.userReaction === 'dislike') u.dislikes--;
+            reaction === 'like' ? u.likes++ : u.dislikes++;
+            u.userReaction = reaction;
+          }
+          return u;
+        });
+        return { ...ev, extendedProps: { ...ev.extendedProps, comments } };
+      })
     );
-    if (!currentEvent || !currentComment) return;
+  };
 
-    const { nextProps: nextComment, deltas } = getReactionUpdate(currentComment, reaction);
-
-    setEvents((prev) =>
-      prev.map((event) => {
-        if (event.id !== eventId) return event;
-        const comments = event.extendedProps.comments.map((comment) =>
-          comment.id === commentId ? nextComment : comment,
-        );
-        return { ...event, extendedProps: { ...event.extendedProps, comments } };
-      }),
+  // ── 댓글 추가 ──────────────────────────────────────────────
+  const handleAddComment = (eventId, content) => {
+    const newComment = {
+      id: Date.now(),
+      author: user?.name ?? '익명',
+      content,
+      createdAt: formatNow(),
+      likes: 0, dislikes: 0, userReaction: null,
+    };
+    setEventsBase((prev) =>
+      prev.map((ev) =>
+        ev.id !== eventId
+          ? ev
+          : { ...ev, extendedProps: { ...ev.extendedProps, comments: [...ev.extendedProps.comments, newComment] } }
+      )
     );
-
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/schedules/${currentEvent.extendedProps.scheduleId}/comments/${commentId}/reactions`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(deltas),
-        },
-      );
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(data.detail || data.message || '댓글 반응을 저장하지 못했습니다.');
-      }
-
-      setEvents((prev) =>
-        prev.map((event) => {
-          if (event.id !== eventId) return event;
-          const comments = event.extendedProps.comments.map((comment) =>
-            comment.id === commentId
-              ? {
-                  ...comment,
-                  likes: data.likes ?? comment.likes,
-                  dislikes: data.dislikes ?? comment.dislikes,
-                }
-              : comment,
-          );
-          return { ...event, extendedProps: { ...event.extendedProps, comments } };
-        }),
-      );
-    } catch (error) {
-      setEvents((prev) =>
-        prev.map((event) => {
-          if (event.id !== eventId) return event;
-          const comments = event.extendedProps.comments.map((comment) =>
-            comment.id === commentId ? currentComment : comment,
-          );
-          return { ...event, extendedProps: { ...event.extendedProps, comments } };
-        }),
-      );
-      alert(error.message);
-    }
   };
 
-  const handleAddComment = async (eventId, content) => {
-    const currentEvent = events.find((event) => event.id === eventId);
-    if (!currentEvent) return;
-
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/schedules/${currentEvent.extendedProps.scheduleId}/comments`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            author: user?.name ?? 'unknown',
-            content,
-          }),
-        },
-      );
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(data.detail || data.message || '댓글을 저장하지 못했습니다.');
-      }
-
-      await loadSchedules();
-    } catch (error) {
-      alert(error.message);
-    }
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setUser(null);
+    navigate('/login');
   };
 
+  // ─────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-white">
-      <header className="z-10 flex h-16 shrink-0 items-center justify-between border-b border-gray-100 bg-white px-6">
+    <div className="flex flex-col h-screen bg-surface overflow-hidden">
+
+      {/* ━━━ Header ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <header className="h-16 shrink-0 bg-white border-b border-[#D3D6DE] flex items-center justify-between px-6 z-10">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 shadow-sm">
-            <span className="text-sm font-extrabold text-white">C</span>
+          <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center shadow-sm">
+            <span className="text-white text-sm font-extrabold">C</span>
           </div>
-          <span className="text-xl font-extrabold tracking-tight text-gray-800">COM:HUB</span>
+          <span className="text-xl font-extrabold text-[#383642] tracking-tight">COM:HUB</span>
         </div>
 
         <div className="flex items-center gap-3">
@@ -788,27 +638,23 @@ export default function Home() {
             <>
               <button
                 onClick={() => setIsAddModalOpen(true)}
-                className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-700 active:scale-95"
+                className="flex items-center gap-1.5 px-4 py-2 bg-primary-500 text-white text-sm font-semibold rounded-lg hover:bg-primary-600 active:scale-95 transition-all shadow-sm"
               >
                 <span className="text-base leading-none">+</span>
                 <span>새 일정 등록</span>
               </button>
               <button
                 onClick={() => navigate('/profile')}
-                className="flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1.5 transition-all hover:bg-indigo-100 active:scale-95"
+                className="flex items-center gap-2 px-3 py-1.5 bg-primary-50 rounded-full hover:bg-primary-100 active:scale-95 transition-all"
               >
-                <div className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-indigo-200">
-                  {user.profileImage ? (
-                    <img src={user.profileImage} alt="프로필" className="h-full w-full object-cover" />
-                  ) : (
-                    <span className="text-xs font-bold text-indigo-700">{user.name?.charAt(0)}</span>
-                  )}
+                <div className="w-6 h-6 bg-primary-200 rounded-full flex items-center justify-center">
+                  <span className="text-xs font-bold text-primary-700">{user.name.charAt(0)}</span>
                 </div>
-                <span className="text-sm font-semibold text-indigo-800">{user.name}님</span>
+                <span className="text-sm font-semibold text-primary-700">{user.name}님</span>
               </button>
               <button
                 onClick={handleLogout}
-                className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-500 transition-all hover:bg-gray-50 hover:text-gray-700 active:scale-95"
+                className="px-3 py-1.5 text-sm font-semibold text-[#ACB1BE] border border-[#D3D6DE] rounded-lg hover:bg-[#E7EBF6] hover:text-[#383642] active:scale-95 transition-all"
               >
                 로그아웃
               </button>
@@ -816,7 +662,7 @@ export default function Home() {
           ) : (
             <button
               onClick={() => navigate('/login')}
-              className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-indigo-700 active:scale-95"
+              className="px-5 py-2 bg-primary-500 text-white text-sm font-semibold rounded-lg hover:bg-primary-600 active:scale-95 transition-all shadow-sm"
             >
               로그인
             </button>
@@ -824,11 +670,12 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+      {/* ━━━ Main ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <div className="flex flex-1 overflow-hidden min-h-0">
+
+        {/* ── 좌측: 캘린더 (70%) ─────────────────────────────── */}
         <section
-          className={`relative overflow-y-auto bg-white p-5 ${
-            hasActiveFilters ? 'calendar-has-filters' : ''
-          }`}
+          className={`bg-white overflow-y-auto p-5 relative ${hasActiveFilters ? 'calendar-has-filters' : ''}`}
           style={{ flex: '7 7 0' }}
         >
           {isFilterOpen && (
@@ -843,126 +690,101 @@ export default function Home() {
             />
           )}
 
-          {scheduleError && (
-            <div className="mb-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
-              {scheduleError}
-            </div>
-          )}
-
           <FullCalendar
-            ref={calendarRef}
             plugins={[dayGridPlugin, interactionPlugin]}
             initialView="dayGridMonth"
             locale="ko"
-            events={filteredCalendarEvents}
+            events={filteredEvents}
             dateClick={handleDateClick}
             eventClick={handleCalendarEventClick}
             eventCursor="pointer"
             height="auto"
             customButtons={{
               filterBtn: {
-                text: '필터',
+                text: '📅',
                 hint: '캘린더 필터',
-                click: () => setIsFilterOpen((prev) => !prev),
-              },
-              todayBtn: {
-                text: '오늘',
-                click: () => {
-                  calendarRef.current?.getApi().today();
-                  setSelectedDate(getTodayStr());
-                  setPanelView('list');
-                  setDetailEventId(null);
-                },
+                click: () => setIsFilterOpen((p) => !p),
               },
             }}
             headerToolbar={{
-              left: 'prev,next todayBtn',
+              left:   'prev,next today',
               center: 'title',
-              right: 'dayGridMonth,dayGridWeek filterBtn',
+              right:  'dayGridMonth,dayGridWeek filterBtn',
             }}
-            buttonText={{ month: '월별', week: '주별' }}
+            buttonText={{ today: '오늘', month: '월별', week: '주별' }}
             dayCellContent={(arg) => arg.date.getDate()}
-            dayCellClassNames={(arg) => {
-              const d = arg.date;
-              const dateStr = [
-                d.getFullYear(),
-                String(d.getMonth() + 1).padStart(2, '0'),
-                String(d.getDate()).padStart(2, '0'),
-              ].join('-');
-              return dateStr === selectedDate ? ['day-selected'] : [];
+            eventContent={(arg) => {
+              const firstTag  = arg.event.extendedProps.tags?.[0];
+              const textColor = TAG_TEXT_COLORS[firstTag] ?? '#383642';
+              return (
+                <div style={{ color: textColor, fontWeight: 600, fontSize: '0.72rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '1px 4px' }}>
+                  {arg.event.title}
+                </div>
+              );
             }}
           />
         </section>
 
+        {/* ── 우측: Daily Agenda / 상세 패널 (30%) ───────────── */}
+        {/* overflow-hidden + flex flex-col → 각 뷰가 내부 스크롤 관리 */}
         <aside
-          className="flex flex-col overflow-hidden border-l border-gray-200 bg-gray-50"
+          className="border-l border-gray-100 bg-surface flex flex-col overflow-hidden"
           style={{ flex: '3 3 0' }}
         >
           {panelView === 'list' ? (
-            <div className="flex h-full flex-col overflow-hidden">
-              <div className="shrink-0 border-b border-gray-200 bg-gray-50 px-6 pb-4 pt-6">
-                <p className="mb-1 text-xs font-bold uppercase tracking-widest text-indigo-500">
+            /* ── 목록 뷰 ──────────────────────────────────────── */
+            <div className="flex flex-col h-full overflow-hidden">
+              {/* 날짜 헤더 (고정) */}
+              <div className="px-6 pt-6 pb-4 border-b border-gray-100 bg-surface shrink-0">
+                <p className="text-xs font-bold text-primary-500 uppercase tracking-widest mb-1">
                   Daily Agenda
                 </p>
-                <h2 className="text-2xl font-extrabold leading-tight text-gray-800">
+                <h2 className="text-2xl font-extrabold text-[#383642] leading-tight">
                   {formatDateLabel(selectedDate)}
                 </h2>
-                <p className="mt-1.5 text-xs text-gray-400">
+                <p className="text-xs text-[#ACB1BE] mt-1.5">
                   {agendaEvents.length > 0 ? `총 ${agendaEvents.length}개의 일정` : '일정 없음'}
                 </p>
               </div>
 
+              {/* 일정 카드 목록 (스크롤) */}
               <div className="flex-1 overflow-y-auto px-6 py-2">
                 {agendaEvents.length === 0 ? (
-                  <div className="flex h-full select-none flex-col items-center justify-center py-16 text-center">
-                    <div className="mb-3 text-4xl">-</div>
-                    <p className="text-sm font-semibold text-gray-500">예정된 일정이 없습니다.</p>
-                    <p className="mt-1.5 text-xs text-gray-400">
-                      달력에서 다른 날짜를 클릭해 보세요.
-                    </p>
+                  <div className="flex flex-col items-center justify-center h-full py-16 text-center select-none">
+                    <div className="text-4xl mb-3">🗓️</div>
+                    <p className="text-sm font-semibold text-[#ACB1BE]">예정된 일정이 없습니다.</p>
+                    <p className="text-xs text-[#ACB1BE] mt-1.5">달력에서 다른 날짜를 클릭해 보세요.</p>
                   </div>
                 ) : (
-                  agendaEvents.map((event, index) => (
+                  agendaEvents.map((ev, i) => (
                     <AgendaCard
-                      key={event.id}
-                      event={event}
-                      isLast={index === agendaEvents.length - 1}
-                      onDetail={() => handleShowDetail(event.id)}
+                      key={ev.id}
+                      event={ev}
+                      isLast={i === agendaEvents.length - 1}
+                      onDetail={() => handleShowDetail(ev.id)}
                     />
                   ))
                 )}
               </div>
             </div>
           ) : detailEvent ? (
+            /* ── 상세 뷰 ──────────────────────────────────────── */
             <EventDetailPanel
               event={detailEvent}
               onBack={handleBackToList}
               onReact={(reaction) => handleEventReaction(detailEventId, reaction)}
-              onCommentReact={(commentId, reaction) =>
-                handleCommentReaction(detailEventId, commentId, reaction)
-              }
+              onCommentReact={(commentId, reaction) => handleCommentReaction(detailEventId, commentId, reaction)}
               onAddComment={(content) => handleAddComment(detailEventId, content)}
-              onEdit={user ? () => handleOpenEdit(detailEventId) : undefined}
-              onDelete={user ? () => handleDeleteEvent(detailEventId) : undefined}
               user={user}
             />
           ) : null}
         </aside>
       </div>
 
+      {/* 새 일정 등록 모달 */}
       <EventAddModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        onCreated={loadSchedules}
-      />
-
-      <EventAddModal
-        key={editTargetEvent?.id ?? 'edit-modal'}
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        onCreated={() => { loadSchedules(); setIsEditModalOpen(false); }}
-        mode="edit"
-        initialData={editTargetEvent ? buildEditInitialData(editTargetEvent) : null}
       />
     </div>
   );

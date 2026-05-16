@@ -48,9 +48,9 @@ export default function Login() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-surface">
       {/* 왼쪽 브랜드 패널 */}
-      <div className="hidden lg:flex lg:w-[420px] shrink-0 bg-indigo-600 flex-col justify-between p-10">
+      <div className="hidden lg:flex lg:w-[420px] shrink-0 bg-primary-500 flex-col justify-between p-10">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center">
             <span className="text-white text-sm font-extrabold">C</span>
@@ -82,14 +82,14 @@ export default function Login() {
         <div className="w-full max-w-sm">
           {/* 모바일용 로고 */}
           <div className="flex lg:hidden items-center gap-2.5 mb-8">
-            <div className="w-8 h-8 bg-indigo-600 rounded-xl flex items-center justify-center shadow-sm">
+            <div className="w-8 h-8 bg-primary-500 rounded-xl flex items-center justify-center shadow-sm">
               <span className="text-white text-sm font-extrabold">C</span>
             </div>
             <span className="text-lg font-extrabold text-gray-800 tracking-tight">COM:HUB</span>
           </div>
 
           <div className="mb-8">
-            <p className="text-xs font-bold text-indigo-500 uppercase tracking-widest mb-2">로그인</p>
+            <p className="text-xs font-bold text-primary-500 uppercase tracking-widest mb-2">로그인</p>
             <h1 className="text-2xl font-extrabold text-gray-800 leading-tight">다시 오신 것을<br />환영합니다</h1>
             <p className="mt-2 text-sm text-gray-400">아이디와 비밀번호로 접속하세요</p>
           </div>
@@ -103,7 +103,7 @@ export default function Login() {
                 onChange={(event) => setLoginId(event.target.value)}
                 placeholder="아이디를 입력하세요"
                 autoComplete="username"
-                className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 placeholder-gray-300 shadow-sm transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 placeholder-gray-300 shadow-sm transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-300"
               />
             </div>
 
@@ -118,14 +118,14 @@ export default function Login() {
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder="비밀번호를 입력하세요"
                 autoComplete="current-password"
-                className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 placeholder-gray-300 shadow-sm transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 placeholder-gray-300 shadow-sm transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-300"
               />
             </div>
 
             <button
               type="submit"
               disabled={isSubmitting}
-              className="mt-2 w-full rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-indigo-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-indigo-300"
+              className="mt-2 w-full rounded-xl bg-primary-500 py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-primary-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-primary-200"
             >
               {isSubmitting ? '로그인 중...' : '로그인'}
             </button>
@@ -136,7 +136,7 @@ export default function Login() {
             <button
               type="button"
               onClick={() => navigate('/signup')}
-              className="font-semibold text-indigo-600 hover:text-indigo-700"
+              className="font-semibold text-primary-500 hover:text-indigo-700"
             >
               회원가입
             </button>
