@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+/* FullCalendar 버튼이 Tailwind preflight의 영향을 받지 않도록 보정 */
+.fc .fc-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
