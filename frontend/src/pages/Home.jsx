@@ -577,6 +577,33 @@ export default function Home() {
     setIsEditModalOpen(true);
   };
 
+  const handleDeleteEvent = async (eventId) => {
+    const event = events.find((e) => e.id === eventId);
+    if (!event) return;
+    if (!window.confirm('이 일정을 삭제하시겠습니까?')) return;
+
+    const scheduleId = event.extendedProps.scheduleId;
+
+    setEvents((prev) => prev.filter((e) => e.id !== eventId));
+    handleBackToList();
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/schedules/${scheduleId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.detail || data.message || '삭제에 실패했습니다.');
+      }
+    } catch (error) {
+      setEvents((prev) => {
+        const stillAbsent = !prev.find((e) => e.id === eventId);
+        return stillAbsent ? [...prev, event] : prev;
+      });
+      alert(`일정 삭제 실패\n${error.message}`);
+    }
+  };
+
   const handleEventReaction = async (eventId, reaction) => {
     const currentEvent = events.find((event) => event.id === eventId);
     if (!currentEvent) return;
@@ -835,6 +862,7 @@ export default function Home() {
               }
               onAddComment={(content) => handleAddComment(detailEventId, content)}
               onEdit={user ? () => handleOpenEdit(detailEventId) : undefined}
+              onDelete={user ? () => handleDeleteEvent(detailEventId) : undefined}
               user={user}
             />
           ) : null}
