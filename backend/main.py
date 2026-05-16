@@ -216,6 +216,7 @@ class ScheduleReactionRequest(BaseModel):
 class CommentCreateRequest(BaseModel):
     author: str = Field(min_length=1, max_length=50)
     content: str = Field(min_length=1)
+    parentId: int | None = None
 
     @field_validator("author", "content")
     @classmethod
@@ -344,6 +345,7 @@ def init_tables() -> None:
             CREATE TABLE IF NOT EXISTS schedule_comments (
               id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
               schedule_id BIGINT UNSIGNED NOT NULL,
+                  parent_id BIGINT UNSIGNED NULL,
               author VARCHAR(50) NOT NULL,
               content TEXT NOT NULL,
               like_count INT UNSIGNED NOT NULL DEFAULT 0,
@@ -352,12 +354,21 @@ def init_tables() -> None:
               updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
               PRIMARY KEY (id),
               INDEX idx_schedule_comments_schedule_id (schedule_id),
+                  INDEX idx_schedule_comments_parent_id (parent_id),
               CONSTRAINT fk_schedule_comments_schedule_id
                 FOREIGN KEY (schedule_id) REFERENCES schedules(id)
-                ON DELETE CASCADE
+                    ON DELETE CASCADE,
+                  CONSTRAINT fk_schedule_comments_parent_id
+                    FOREIGN KEY (parent_id) REFERENCES schedule_comments(id)
+                    ON DELETE CASCADE
             )
             """
         )
+        cursor.execute("SHOW COLUMNS FROM schedule_comments LIKE 'parent_id'")
+        if cursor.fetchone() is None:
+            cursor.execute("ALTER TABLE schedule_comments ADD COLUMN parent_id BIGINT UNSIGNED NULL AFTER schedule_id")
+            cursor.execute("ALTER TABLE schedule_comments ADD CONSTRAINT fk_schedule_comments_parent_id FOREIGN KEY (parent_id) REFERENCES schedule_comments(id) ON DELETE CASCADE")
+            
         connection.commit()
     finally:
         cursor.close()
@@ -402,6 +413,7 @@ def to_comment_response(row: dict) -> dict:
     return {
         "id": row["id"],
         "scheduleId": row["schedule_id"],
+        "parentId": row.get("parent_id"),
         "author": row["author"],
         "content": row["content"],
         "likes": row["like_count"],
@@ -417,18 +429,30 @@ def fetch_comments_by_schedule_ids(cursor, schedule_ids: list[int]) -> dict[int,
     placeholders = ", ".join(["%s"] * len(schedule_ids))
     cursor.execute(
         f"""
-        SELECT id, schedule_id, author, content, like_count, dislike_count, created_at
+        SELECT id, schedule_id, parent_id, author, content, like_count, dislike_count, created_at
         FROM schedule_comments
         WHERE schedule_id IN ({placeholders})
         ORDER BY created_at ASC, id ASC
         """,
         schedule_ids,
     )
+    all_comments = cursor.fetchall()
     comments_by_schedule_id = {schedule_id: [] for schedule_id in schedule_ids}
-    for comment in cursor.fetchall():
-        comments_by_schedule_id.setdefault(comment["schedule_id"], []).append(
-            to_comment_response(comment)
-        )
+    
+    # 1. 최상위 댓글 (parent_id가 없는 댓글) 그룹핑
+    for comment in all_comments:
+        if comment.get("parent_id") is None:
+            c_resp = to_comment_response(comment)
+            c_resp["replies"] = []
+            comments_by_schedule_id.setdefault(comment["schedule_id"], []).append(c_resp)
+            
+    # 2. 대댓글을 부모 댓글의 replies 배열에 담기
+    for comment in all_comments:
+        if comment.get("parent_id") is not None:
+            for parent_comment in comments_by_schedule_id.get(comment["schedule_id"], []):
+                if parent_comment["id"] == comment["parent_id"]:
+                    parent_comment.setdefault("replies", []).append(to_comment_response(comment))
+                    break
     return comments_by_schedule_id
 
 
@@ -711,7 +735,7 @@ def list_schedule_comments_for_test(schedule_id: int):
 
             cursor.execute(
                 """
-                SELECT id, schedule_id, author, content, like_count, dislike_count, created_at
+                SELECT id, schedule_id, parent_id, author, content, like_count, dislike_count, created_at
                 FROM schedule_comments
                 WHERE schedule_id = %s
                 ORDER BY created_at ASC, id ASC
@@ -983,24 +1007,20 @@ def create_schedule_comment(schedule_id: int, payload: CommentCreateRequest):
 
             cursor.execute(
                 """
-                INSERT INTO schedule_comments (schedule_id, author, content)
-                VALUES (%s, %s, %s)
+                INSERT INTO schedule_comments
+                  (schedule_id, parent_id, author, content)
+                VALUES (%s, %s, %s, %s)
                 """,
-                (schedule_id, payload.author, payload.content),
+                (schedule_id, payload.parentId, payload.author, payload.content),
             )
             connection.commit()
             comment_id = cursor.lastrowid
 
             cursor.execute(
-                """
-                SELECT id, schedule_id, author, content, like_count, dislike_count, created_at
-                FROM schedule_comments
-                WHERE id = %s
-                LIMIT 1
-                """,
-                (comment_id,),
+                "SELECT id, schedule_id, parent_id, author, content, like_count, dislike_count, created_at FROM schedule_comments WHERE id = %s",
+                (comment_id,)
             )
-            comment = cursor.fetchone()
+            new_comment = cursor.fetchone()
         finally:
             cursor.close()
             connection.close()
@@ -1009,212 +1029,10 @@ def create_schedule_comment(schedule_id: int, payload: CommentCreateRequest):
     except mysql.connector.Error:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create schedule comment.",
+            detail="Failed to create comment.",
         )
 
     return {
-        "message": "Schedule comment created.",
-        "comment": to_comment_response(comment),
-    }
-
-
-@app.patch("/api/schedules/{schedule_id}/comments/{comment_id}/reactions")
-def update_schedule_comment_reactions(
-    schedule_id: int,
-    comment_id: int,
-    payload: ScheduleReactionRequest,
-):
-    try:
-        connection = get_connection()
-        cursor = connection.cursor(dictionary=True)
-        try:
-            cursor.execute(
-                """
-                UPDATE schedule_comments
-                SET
-                  like_count = GREATEST(CAST(like_count AS SIGNED) + %s, 0),
-                  dislike_count = GREATEST(CAST(dislike_count AS SIGNED) + %s, 0)
-                WHERE id = %s AND schedule_id = %s
-                """,
-                (payload.likeDelta, payload.dislikeDelta, comment_id, schedule_id),
-            )
-            if cursor.rowcount == 0:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Schedule comment not found.",
-                )
-            connection.commit()
-
-            cursor.execute(
-                """
-                SELECT like_count, dislike_count
-                FROM schedule_comments
-                WHERE id = %s AND schedule_id = %s
-                LIMIT 1
-                """,
-                (comment_id, schedule_id),
-            )
-            counts = cursor.fetchone()
-        finally:
-            cursor.close()
-            connection.close()
-    except HTTPException:
-        raise
-    except mysql.connector.Error:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update schedule comment reactions.",
-        )
-
-    return {
-        "message": "Schedule comment reactions updated.",
-        "id": comment_id,
-        "scheduleId": schedule_id,
-        "likes": counts["like_count"],
-        "dislikes": counts["dislike_count"],
-    }
-
-
-@app.post("/api/schedules", status_code=status.HTTP_201_CREATED)
-def create_schedule(payload: ScheduleCreateRequest):
-    try:
-        connection = get_connection()
-        cursor = connection.cursor()
-        try:
-            cursor.execute(
-                """
-                INSERT INTO schedules
-                  (title, start_date, end_date, content, photo, link, note,
-                   grade, notice, hashtag, author)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """,
-                (
-                    payload.title,
-                    payload.startDate,
-                    payload.endDate,
-                    payload.content,
-                    payload.photo,
-                    payload.link,
-                    payload.note,
-                    payload.grade,
-                    payload.notice,
-                    payload.hashtag,
-                    payload.author,
-                ),
-            )
-            connection.commit()
-            schedule_id = cursor.lastrowid
-        finally:
-            cursor.close()
-            connection.close()
-    except mysql.connector.Error:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create schedule.",
-        )
-
-    return {
-        "message": "Schedule created.",
-        "id": schedule_id,
-    }
-
-
-@app.put("/api/schedules/{schedule_id}")
-def update_schedule(schedule_id: int, payload: ScheduleUpdateRequest):
-    updates = payload.model_dump(exclude_unset=True)
-    if not updates:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No fields to update.",
-        )
-
-    column_map = {
-        "title": "title",
-        "startDate": "start_date",
-        "endDate": "end_date",
-        "content": "content",
-        "photo": "photo",
-        "link": "link",
-        "note": "note",
-        "grade": "grade",
-        "notice": "notice",
-        "hashtag": "hashtag",
-        "author": "author",
-    }
-
-    try:
-        connection = get_connection()
-        cursor = connection.cursor(dictionary=True)
-        try:
-            cursor.execute(
-                "SELECT start_date, end_date FROM schedules WHERE id = %s LIMIT 1",
-                (schedule_id,),
-            )
-            current_schedule = cursor.fetchone()
-            if not current_schedule:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Schedule not found.",
-                )
-
-            next_start = updates.get("startDate", current_schedule["start_date"])
-            next_end = updates.get("endDate", current_schedule["end_date"])
-            if next_end < next_start:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="endDate must be greater than or equal to startDate.",
-                )
-
-            set_clause = ", ".join(f"{column_map[field]} = %s" for field in updates)
-            values = [updates[field] for field in updates]
-            values.append(schedule_id)
-            cursor.execute(
-                f"UPDATE schedules SET {set_clause} WHERE id = %s",
-                values,
-            )
-            connection.commit()
-        finally:
-            cursor.close()
-            connection.close()
-    except HTTPException:
-        raise
-    except mysql.connector.Error:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update schedule.",
-        )
-
-    return {
-        "message": "Schedule updated.",
-        "id": schedule_id,
-    }
-
-
-@app.delete("/api/schedules/{schedule_id}")
-def delete_schedule(schedule_id: int):
-    try:
-        connection = get_connection()
-        cursor = connection.cursor()
-        try:
-            cursor.execute("DELETE FROM schedules WHERE id = %s", (schedule_id,))
-            connection.commit()
-            deleted_count = cursor.rowcount
-        finally:
-            cursor.close()
-            connection.close()
-    except mysql.connector.Error:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete schedule.",
-        )
-
-    if deleted_count == 0:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Schedule not found.",
-        )
-
-    return {
-        "message": "Schedule deleted.",
-        "id": schedule_id,
+        "message": "Comment created.",
+        "comment": to_comment_response(new_comment)
     }

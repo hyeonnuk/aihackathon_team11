@@ -9,6 +9,7 @@ import '../App.css';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import EventAddModal from '../components/EventAddModal';
 
 // ──────────────────────────────────────────────────────────────
 // 더미 이벤트 데이터
@@ -154,6 +155,15 @@ export default function DashboardPage() {
 
   // 캘린더에서 선택된 이벤트
   const [selectedEvent, setSelectedEvent] = useState(null);
+  
+  // 새 일정 모달 상태 및 로컬에 저장된 커스텀 이벤트들 불러오기
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [localEvents, setLocalEvents] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('local_events')) || []; }
+    catch { return []; }
+  });
+
+  const allEvents = [...EVENTS, ...localEvents];
 
   // 로그아웃: localStorage 삭제 → 상태 초기화 → 로그인 페이지로 이동
   const handleLogout = () => {
@@ -191,7 +201,10 @@ export default function DashboardPage() {
             // ── 로그인 상태 ──────────────────────────────────────
             <>
               {/* 새 일정 등록 버튼 */}
-              <button className="flex items-center gap-1.5 px-4 py-2 bg-primary-500 text-white text-sm font-semibold rounded-lg hover:bg-primary-600 active:scale-95 transition-all shadow-sm">
+              <button 
+                onClick={() => setIsAddModalOpen(true)}
+                className="flex items-center gap-1.5 px-4 py-2 bg-primary-500 text-white text-sm font-semibold rounded-lg hover:bg-primary-600 active:scale-95 transition-all shadow-sm"
+              >
                 <span className="text-base leading-none">+</span>
                 <span>새 일정 등록</span>
               </button>
@@ -240,7 +253,7 @@ export default function DashboardPage() {
             plugins={[dayGridPlugin, interactionPlugin]}
             initialView="dayGridMonth"
             locale="ko"
-            events={EVENTS}
+            events={allEvents}
             eventClick={handleEventClick}
             eventCursor="pointer"
             height="auto"
@@ -265,6 +278,15 @@ export default function DashboardPage() {
         </aside>
 
       </main>
+
+      <EventAddModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onCreated={() => {
+          const updated = JSON.parse(localStorage.getItem('local_events') || '[]');
+          setLocalEvents(updated);
+        }}
+      />
     </div>
   );
 }

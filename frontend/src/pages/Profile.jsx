@@ -18,7 +18,7 @@ const BADGE_CONFIG = {
   BABY_MUHAN: { id: 'b1', label: '아기 무한이', icon: '👶', style: 'bg-sky-50 text-sky-700 border-sky-200 ring-sky-100', description: '캘린더에 일정 1회 이상 등록' },
   ADULT_MUHAN: { id: 'b2', label: '어른 무한이', icon: '🧑', style: 'bg-blue-50 text-blue-700 border-blue-200 ring-blue-100', description: '캘린더 일정 10회 이상 등록' },
   GRANDMA_MUHAN: { id: 'b3', label: '할미 무한이', icon: '👵', style: 'bg-primary-50 text-primary-600 border-primary-200 ring-primary-100', description: '캘린더 일정 50회 이상 등록' },
-  HACKATHON: { id: 'b4', label: '해커톤 참여자', icon: '💻', style: 'bg-violet-50 text-violet-700 border-violet-200 ring-violet-100', description: '해커톤 참여' },
+  HACKATHON: { id: 'b4', label: '해커톤 참여자', icon: '💻', style: 'bg-violet-50 text-[#6e5a9e] border-violet-200 ring-violet-100', description: '해커톤 참여' },
   STRAIGHT_MUHAN: { id: 'b5', label: '직진중인 무한이', icon: '🏃', style: 'bg-emerald-50 text-emerald-700 border-emerald-200 ring-emerald-100', description: '댓글 3회 이상 작성' },
   SPEEDING_MUHAN: { id: 'b6', label: '과속 무한이', icon: '💨', style: 'bg-orange-50 text-orange-700 border-orange-200 ring-orange-100', description: '댓글 5회 이상 작성' },
   RAMPAGE_MUHAN: { id: 'b7', label: '폭주 무한이', icon: '🏍️', style: 'bg-rose-50 text-rose-700 border-rose-200 ring-rose-100', description: '댓글 10회 이상 작성' },

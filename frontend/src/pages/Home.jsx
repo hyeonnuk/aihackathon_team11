@@ -241,9 +241,9 @@ function scheduleToEvent(schedule) {
   };
 }
 
-function getFilteredEvents(events, selectedGrades, selectedTags) {
-  if (selectedGrades.length === 0 && selectedTags.length === 0) return events;
-  return events.filter(({ extendedProps: { grade, tags } }) => {
+function getFilteredEvents(events, selectedGrades, selectedTags, showNoticeOnly) {
+  return events.filter(({ extendedProps: { grade, tags, notice } }) => {
+    if (showNoticeOnly && !notice) return false;
     const gradeOk = selectedGrades.length === 0 || selectedGrades.some((g) => grade.includes(g));
     const tagOk = selectedTags.length === 0 || selectedTags.some((t) => tags.includes(t));
     return gradeOk && tagOk;
@@ -402,7 +402,7 @@ function AgendaCard({ event, isLast, onDetail }) {
   );
 }
 
-function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTagChange, onClose }) {
+function CalendarFilterPopup({ selectedGrades, selectedTags, showNoticeOnly, onGradeChange, onTagChange, onNoticeChange, onClose }) {
   return (
     <div
       className="calendar-filter-popup absolute z-50 rounded-2xl border border-gray-100 bg-white p-5 shadow-xl"
@@ -418,6 +418,24 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTa
         </button>
       </div>
       <p className="mb-4 text-xs text-gray-400">표시할 캘린더를 선택하세요.</p>
+
+      <div className="mb-4">
+        <p className="mb-2.5 text-[10px] font-bold uppercase tracking-widest text-primary-500">공지</p>
+        <button
+          onClick={() => onNoticeChange((prev) => !prev)}
+          onMouseEnter={(e) => { if (!showNoticeOnly) { e.currentTarget.style.borderColor = '#f8927d'; e.currentTarget.style.color = '#f8927d'; } }}
+          onMouseLeave={(e) => { if (!showNoticeOnly) { e.currentTarget.style.borderColor = '#D3D6DE'; e.currentTarget.style.color = '#ACB1BE'; } }}
+          className="rounded-full border px-3 py-1 text-xs font-semibold transition-all active:scale-95"
+          style={showNoticeOnly
+            ? { backgroundColor: '#f8927d', borderColor: '#f8927d', color: 'white' }
+            : { backgroundColor: 'white', borderColor: '#D3D6DE', color: '#ACB1BE' }
+          }
+        >
+          공지만 보기
+        </button>
+      </div>
+
+      <div className="mb-4 h-px bg-gray-100" />
 
       <div className="mb-4">
         <p className="mb-2.5 text-[10px] font-bold uppercase tracking-widest text-primary-500">학년</p>
@@ -489,11 +507,12 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTa
         </div>
       </div>
 
-      {(selectedGrades.length > 0 || selectedTags.length > 0) && (
+      {(selectedGrades.length > 0 || selectedTags.length > 0 || showNoticeOnly) && (
         <button
           onClick={() => {
             onGradeChange([]);
             onTagChange([]);
+            onNoticeChange(false);
           }}
           className="mt-4 w-full rounded-lg border border-primary-200 py-2 text-xs font-semibold text-primary-500 transition-all hover:bg-primary-50 hover:text-primary-700"
         >
@@ -516,6 +535,7 @@ export default function Home() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedGrades, setSelectedGrades] = useState([]);
   const [selectedTags, setSelectedTags] = useState([]);
+  const [showNoticeOnly, setShowNoticeOnly] = useState(false);
   const [events, setEvents] = useState([]);
   const [scheduleError, setScheduleError] = useState('');
   const [panelView, setPanelView] = useState('list');
@@ -523,7 +543,7 @@ export default function Home() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editTargetEvent, setEditTargetEvent] = useState(null);
 
-  const hasActiveFilters = selectedGrades.length > 0 || selectedTags.length > 0;
+  const hasActiveFilters = selectedGrades.length > 0 || selectedTags.length > 0 || showNoticeOnly;
 
   const loadSchedules = async () => {
     setScheduleError('');
@@ -535,7 +555,7 @@ export default function Home() {
         throw new Error(data.detail || data.message || '일정을 불러오지 못했습니다.');
       }
 
-      setEvents((data.schedules || []).map((schedule, index) => scheduleToEvent(schedule, index)));
+      setEvents((data.schedules || []).map((schedule) => scheduleToEvent(schedule)));
     } catch (error) {
       setScheduleError(error.message);
       setEvents([]);
@@ -563,6 +583,7 @@ export default function Home() {
     setPanelView('detail');
   }, [events, searchParams]);
 
+
   useEffect(() => {
     if (!isFilterOpen) return;
     const handler = (event) => {
@@ -577,8 +598,8 @@ export default function Home() {
   }, [isFilterOpen]);
 
   const filteredCalendarEvents = useMemo(
-    () => getFilteredEvents(events, selectedGrades, selectedTags),
-    [events, selectedGrades, selectedTags],
+    () => getFilteredEvents(events, selectedGrades, selectedTags, showNoticeOnly),
+    [events, selectedGrades, selectedTags, showNoticeOnly],
   );
   const agendaEvents = useMemo(
     () => getEventsForDate(filteredCalendarEvents, selectedDate),
@@ -855,8 +876,10 @@ export default function Home() {
             <CalendarFilterPopup
               selectedGrades={selectedGrades}
               selectedTags={selectedTags}
+              showNoticeOnly={showNoticeOnly}
               onGradeChange={setSelectedGrades}
               onTagChange={setSelectedTags}
+              onNoticeChange={setShowNoticeOnly}
               onClose={() => setIsFilterOpen(false)}
             />
           )}
