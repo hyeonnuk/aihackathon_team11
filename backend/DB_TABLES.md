@@ -26,6 +26,7 @@ Stores registered user accounts.
 | `login_id` | `VARCHAR(50)` | Yes | Unique | `loginId` | Login ID |
 | `password_hash` | `VARCHAR(255)` | Yes |  | Not returned | Bcrypt password hash |
 | `profile_image` | `LONGTEXT` | No |  | `profileImage` | Optional profile image data URL |
+| `role` | `ENUM('master', 'admin', 'user')` | Yes |  | `role` | User permission role. Defaults to `user` |
 | `created_at` | `TIMESTAMP` | Yes |  | `createdAt` | Created time |
 | `updated_at` | `TIMESTAMP` | Yes |  |  | Updated time |
 

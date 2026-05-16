@@ -133,6 +133,12 @@
   border-collapse: collapse !important;
 }
 
+/* 월별 뷰 — 날짜 셀 최소 높이 + +N 절대 위치 기준 */
+.fc-dayGridMonth-view .fc-daygrid-day-frame {
+  min-height: 105px;
+  position: relative;
+}
+
 /* 주별 뷰 — 세로 구분선을 끝까지 연장 */
 .fc-dayGridWeek-view .fc-daygrid-day,
 .fc-dayGridWeek-view .fc-daygrid-day-frame {
