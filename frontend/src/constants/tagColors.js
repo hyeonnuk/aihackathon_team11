@@ -3,7 +3,7 @@ export const TAG_COLORS = {
   '프로젝트': '#bde1fd',
   '스터디':   '#c5e9d8',
   '공모전':   '#fcd5e5',
-  '장학/취업': '#fde68a',
+  '장학/취업': '#fceba5',
 };
 
 export const TAG_TEXT_COLORS = {

@@ -780,10 +780,11 @@ export default function Home() {
       console.error(e);
     }
     const memoEvents = localMemos.map(memo => {
+      const base = { ...memo, backgroundColor: '#fccb86', borderColor: '#fccb86', textColor: '#635746' };
       if (memo.allDay && memo.end) {
-        return { ...memo, end: addOneDay(memo.end) };
+        return { ...base, end: addOneDay(memo.end) };
       }
-      return memo;
+      return base;
     });
 
     try {

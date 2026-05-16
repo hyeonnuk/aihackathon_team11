@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react';
 
 const INPUT =
   'w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-800 ' +
-  'placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-amber-400 ' +
+  'placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-[#fccb86] ' +
   'focus:border-transparent transition';
 
-function Field({ label, required, children }) {
+function Field({ label, required, children, className = '' }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className={`flex flex-col gap-1.5 ${className}`}>
       <label className="text-xs font-semibold text-gray-600">
         {label}
         {required && <span className="ml-0.5 text-red-400">*</span>}
@@ -88,8 +88,9 @@ export default function MemoAddModal({ isOpen, onClose, onCreated, initialData =
       start: form.isAllDay ? form.startDate : `${form.startDate}T${form.startTime}:00`,
       end: form.isAllDay ? finalEndDate : `${finalEndDate}T${form.endTime}:00`,
       allDay: form.isAllDay,
-      backgroundColor: '#f59e0b', // amber-500
-      borderColor: '#f59e0b',
+      backgroundColor: '#fccb86',
+      borderColor: '#fccb86',
+      textColor: '#635746',
       extendedProps: {
         grade: [],
         tags: ['메모'],
@@ -133,43 +134,47 @@ export default function MemoAddModal({ isOpen, onClose, onCreated, initialData =
         {/* 헤더 */}
         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
           <div>
-            <p className="mb-1 text-[10px] font-bold tracking-widest text-amber-500 uppercase">개인 메모</p>
+            <p className="mb-1 text-[10px] font-bold tracking-widest text-[#fccb86] uppercase">개인 메모</p>
             <h2 className="text-lg font-extrabold leading-tight text-gray-800">{mode === 'edit' ? '메모 수정' : '새 메모 등록'}</h2>
           </div>
           <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full text-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600">✕</button>
         </div>
 
         {/* 본문 폼 */}
-        <div className="flex-1 overflow-y-auto px-6 py-5">
-          <form id="memo-add-form" onSubmit={handleSubmit} className="flex flex-col gap-5">
+        <div className="flex flex-col flex-1 overflow-y-auto px-6 py-5 min-h-0" style={{ scrollbarGutter: 'stable' }}>
+          <form id="memo-add-form" onSubmit={handleSubmit} className="flex flex-col gap-5 flex-1 min-h-0">
             <Field label="메모 제목" required>
               <input type="text" value={form.title} onChange={(e) => handleChange('title', e.target.value)} placeholder="기억할 메모의 제목을 입력하세요" className={INPUT} required />
             </Field>
-            <div className="rounded-xl border border-amber-100 bg-amber-50/30 p-4 flex flex-col gap-4">
+            <div className="w-full rounded-xl border border-[#fccb86] bg-[#fccb86]/10 p-4 flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-bold text-gray-700">일정 시간 설정</span>
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={form.isAllDay} onChange={(e) => handleChange('isAllDay', e.target.checked)} className="h-4 w-4 accent-amber-500" />
+                  <input type="checkbox" checked={form.isAllDay} onChange={(e) => handleChange('isAllDay', e.target.checked)} className="h-4 w-4 accent-[#fccb86]" />
                   <span className="text-xs font-bold text-gray-600">하루 종일</span>
                 </label>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <Field label="시작 날짜/시간" required>
-                  <div className="flex flex-col gap-1.5">
+                  <div className="flex flex-col">
                     <input type="date" value={form.startDate} onChange={(e) => handleChange('startDate', e.target.value)} className={`${INPUT} py-2.5`} required />
-                    {!form.isAllDay && <input type="time" value={form.startTime} onChange={(e) => handleChange('startTime', e.target.value)} className={`${INPUT} py-2.5`} required />}
+                    <div style={{ maxHeight: form.isAllDay ? '0' : '60px', overflow: 'hidden', marginTop: form.isAllDay ? '0' : '6px', transition: 'max-height 0.15s ease, margin-top 0.15s ease' }}>
+                      <input type="time" value={form.startTime} onChange={(e) => handleChange('startTime', e.target.value)} className={`${INPUT} py-2.5`} required />
+                    </div>
                   </div>
                 </Field>
                 <Field label="종료 날짜/시간">
-                  <div className="flex flex-col gap-1.5">
+                  <div className="flex flex-col">
                     <input type="date" value={form.endDate} onChange={(e) => handleChange('endDate', e.target.value)} className={`${INPUT} py-2.5`} />
-                    {!form.isAllDay && <input type="time" value={form.endTime} onChange={(e) => handleChange('endTime', e.target.value)} className={`${INPUT} py-2.5`} />}
+                    <div style={{ maxHeight: form.isAllDay ? '0' : '60px', overflow: 'hidden', marginTop: form.isAllDay ? '0' : '6px', transition: 'max-height 0.15s ease, margin-top 0.15s ease' }}>
+                      <input type="time" value={form.endTime} onChange={(e) => handleChange('endTime', e.target.value)} className={`${INPUT} py-2.5`} />
+                    </div>
                   </div>
                 </Field>
               </div>
             </div>
-            <Field label="메모 내용">
-              <textarea value={form.content} onChange={(e) => handleChange('content', e.target.value)} placeholder="자세한 메모 내용을 작성하세요..." rows={5} className={`${INPUT} resize-none leading-relaxed`} />
+            <Field label="메모 내용" className="flex-1 flex flex-col min-h-0">
+              <textarea value={form.content} onChange={(e) => handleChange('content', e.target.value)} placeholder="자세한 메모 내용을 작성하세요..." className={`${INPUT} resize-none leading-relaxed flex-1 min-h-[80px]`} />
             </Field>
           </form>
         </div>
@@ -177,7 +182,7 @@ export default function MemoAddModal({ isOpen, onClose, onCreated, initialData =
         {/* 푸터 버튼 */}
         <div className="flex items-center justify-end gap-3 border-t border-gray-100 bg-gray-50 px-6 py-4">
           <button type="button" onClick={onClose} className="rounded-xl px-5 py-2.5 text-sm font-bold text-gray-600 transition-colors hover:bg-gray-200">취소</button>
-          <button type="submit" form="memo-add-form" className="rounded-xl bg-amber-500 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-amber-600 active:scale-95">{mode === 'edit' ? '수정 완료' : '메모 저장'}</button>
+          <button type="submit" form="memo-add-form" className="rounded-xl bg-[#fccb86] px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-[#f5b85a] active:scale-95">{mode === 'edit' ? '수정 완료' : '메모 저장'}</button>
         </div>
       </div>
     </div>
