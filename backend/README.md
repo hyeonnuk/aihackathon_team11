@@ -60,7 +60,7 @@ Normal signup always creates a `user` role account.
 POST /api/auth/master
 ```
 
-This endpoint creates a `master` role account. Set `MASTER_CREATE_KEY` in `.env` first, then include the same value as `masterCreateKey`.
+This endpoint creates a `master` role account.
 
 ```json
 {
@@ -70,8 +70,7 @@ This endpoint creates a `master` role account. Set `MASTER_CREATE_KEY` in `.env`
   "phoneNumber": "010-0000-0000",
   "email": "master@example.com",
   "loginId": "master",
-  "password": "password123",
-  "masterCreateKey": "change-this-master-create-key"
+  "password": "password123"
 }
 ```
 
