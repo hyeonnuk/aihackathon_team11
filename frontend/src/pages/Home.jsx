@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import '../App.css';
 import EventAddModal from '../components/EventAddModal';
 import EventDetailPanel from '../components/EventDetailPanel';
+import { TAG_COLORS, TAG_TEXT_COLORS, TAG_CHIP_COLORS, getTagColor } from '../constants/tagColors';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
@@ -12,7 +13,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
 const ALL_GRADES = ['1학년', '2학년', '3학년', '4학년'];
 const ALL_TAGS = ['공모전', '해커톤', '스터디', '프로젝트', '장학/취업'];
-const EVENT_COLORS = ['#818cf8', '#fb7185', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa', '#f472b6'];
+const NOTICE_COLOR = '#ef4444';
 
 const EVENTS_DATA = [
   {
@@ -194,8 +195,10 @@ function gradeToLabels(grade) {
   return [`${grade}학년`];
 }
 
-function scheduleToEvent(schedule, index) {
-  const color = schedule.notice ? '#ef4444' : EVENT_COLORS[index % EVENT_COLORS.length];
+function scheduleToEvent(schedule) {
+  const tags = parseTags(schedule.hashtag);
+  const color = schedule.notice ? NOTICE_COLOR : getTagColor(tags);
+  const firstTag = tags[0];
   const start = getDatePart(schedule.startDate);
   const end = getDatePart(schedule.endDate || schedule.startDate);
 
@@ -207,10 +210,13 @@ function scheduleToEvent(schedule, index) {
     allDay: true,
     backgroundColor: color,
     borderColor: color,
+    textColor: schedule.notice
+      ? '#ffffff'
+      : TAG_TEXT_COLORS[firstTag] ?? '#383642',
     extendedProps: {
       scheduleId: schedule.id,
       grade: gradeToLabels(schedule.grade),
-      tags: parseTags(schedule.hashtag),
+      tags,
       description: schedule.content || '',
       applyPeriod: start && end ? `${start} ~ ${end}` : null,
       applyEndDate: end || start,
@@ -374,7 +380,11 @@ function AgendaCard({ event, isLast, onDetail }) {
               <span
                 key={tag}
                 className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-                style={{ backgroundColor: event.backgroundColor + '22', color: event.backgroundColor }}
+                style={{
+                  backgroundColor: '#ffffff',
+                  border: `1px solid ${TAG_CHIP_COLORS[tag] ?? event.backgroundColor}`,
+                  color: TAG_CHIP_COLORS[tag] ?? event.backgroundColor,
+                }}
               >
                 #{tag}
               </span>
@@ -457,11 +467,20 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTa
                     prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
                   )
                 }
-                className={`rounded-full border px-3 py-1 text-xs font-semibold transition-all active:scale-95 ${
+                className="rounded-full border px-3 py-1 text-xs font-semibold transition-all active:scale-95"
+                style={
                   isSelected
-                    ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
-                    : 'border-gray-300 bg-white text-gray-600 hover:border-indigo-400 hover:text-indigo-600'
-                }`}
+                    ? {
+                        backgroundColor: TAG_COLORS[tag] ?? '#ACB1BE',
+                        borderColor: TAG_COLORS[tag] ?? '#ACB1BE',
+                        color: TAG_TEXT_COLORS[tag] ?? '#383642',
+                      }
+                    : {
+                        backgroundColor: '#ffffff',
+                        borderColor: '#D3D6DE',
+                        color: '#ACB1BE',
+                      }
+                }
               >
                 {tag}
               </button>
@@ -890,6 +909,21 @@ export default function Home() {
               ].join('-');
               return dateStr === selectedDate ? ['day-selected'] : [];
             }}
+            eventContent={(arg) => (
+              <div
+                style={{
+                  color: arg.event.textColor || '#383642',
+                  fontWeight: 600,
+                  fontSize: '0.72rem',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  padding: '1px 4px',
+                }}
+              >
+                {arg.event.title}
+              </div>
+            )}
           />
         </section>
 

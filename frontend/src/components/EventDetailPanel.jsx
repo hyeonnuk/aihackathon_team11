@@ -4,6 +4,7 @@
 // ============================================================
 
 import { useEffect, useRef, useState } from 'react';
+import { TAG_CHIP_COLORS } from '../constants/tagColors';
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -257,8 +258,9 @@ export default function EventDetailPanel({
               key={tag}
               className="px-2.5 py-1 text-xs font-semibold rounded-full"
               style={{
-                backgroundColor: event.backgroundColor + '22',
-                color: event.backgroundColor,
+                backgroundColor: '#ffffff',
+                border: `1px solid ${TAG_CHIP_COLORS[tag] ?? event.backgroundColor}`,
+                color: TAG_CHIP_COLORS[tag] ?? event.backgroundColor,
               }}
             >
               #{tag}
