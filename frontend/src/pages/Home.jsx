@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../App.css'; // FullCalendar 버튼 보정 스타일
+import EventAddModal from '../components/EventAddModal';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction'; // dateClick 사용에 필수
@@ -176,6 +177,9 @@ export default function Home() {
   // 선택된 날짜 — 초기값: 오늘 (getTodayStr을 함수로 전달해 1회만 실행)
   const [selectedDate, setSelectedDate] = useState(getTodayStr);
 
+  // 새 일정 등록 모달 열기/닫기
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
   // 로그아웃: Login.jsx가 저장한 token + user 모두 제거
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -220,7 +224,9 @@ export default function Home() {
           {user ? (
             <>
               {/* 새 일정 등록 */}
-              <button className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 active:scale-95 transition-all shadow-sm">
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 active:scale-95 transition-all shadow-sm">
                 <span className="text-base leading-none">+</span>
                 <span>새 일정 등록</span>
               </button>
@@ -343,6 +349,12 @@ export default function Home() {
         </aside>
 
       </div>
+
+      {/* 새 일정 등록 모달 */}
+      <EventAddModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+      />
     </div>
   );
 }
