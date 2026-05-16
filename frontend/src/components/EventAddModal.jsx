@@ -178,7 +178,7 @@ export default function EventAddModal({ isOpen, onClose, onCreated, initialData 
 
     try {
       const response = await fetch(url, {
-        method: isEdit ? 'PATCH' : 'POST',
+        method: isEdit ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
