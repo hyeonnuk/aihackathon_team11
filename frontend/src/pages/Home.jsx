@@ -1274,7 +1274,7 @@ export default function Home() {
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <section
-          className={`relative flex flex-col overflow-hidden bg-white p-5 ${
+          className={`relative flex flex-col overflow-y-auto bg-white p-5 ${
             hasActiveFilters ? 'calendar-has-filters' : ''
           } ${selectedDate === getTodayStr() ? 'calendar-viewing-today' : ''}`}
           style={{ flex: '7 7 0' }}
@@ -1297,7 +1297,7 @@ export default function Home() {
             </div>
           )}
 
-          <div className="min-h-0 flex-1 overflow-hidden">
+          <div className="flex-1">
           <FullCalendar
             ref={calendarRef}
             plugins={[dayGridPlugin, interactionPlugin]}
@@ -1307,7 +1307,7 @@ export default function Home() {
             dateClick={handleDateClick}
             eventClick={handleCalendarEventClick}
             eventCursor="pointer"
-            height="100%"
+            height="auto"
             dayMaxEvents={false}
             datesSet={(arg) => setViewRange({ start: arg.start, end: arg.end })}
             eventOrder={(a, b) => {

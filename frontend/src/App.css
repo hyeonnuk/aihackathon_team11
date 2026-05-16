@@ -135,8 +135,13 @@
 
 /* 월별 뷰 — 날짜 셀 최소 높이 + +N 절대 위치 기준 */
 .fc-dayGridMonth-view .fc-daygrid-day-frame {
-  min-height: 105px;
+  min-height: 140px;
   position: relative;
+}
+
+/* +N 버튼 공간 확보 — 이벤트 막대 3개 + 버튼이 겹치지 않도록 */
+.fc-dayGridMonth-view .fc-daygrid-day-events {
+  padding-bottom: 26px;
 }
 
 /* 주별 뷰 — 세로 구분선을 끝까지 연장 */
