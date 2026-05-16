@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -47,6 +47,23 @@ function toHashtagText(hashtags) {
   return hashtags.length > 0 ? hashtags.map((tag) => `#${tag}`).join(' ') : null;
 }
 
+function fileToDataUrl(file) {
+  if (!file) return Promise.resolve(null);
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('이미지 파일을 읽지 못했습니다.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function normalizeLink(link) {
+  const trimmed = link.trim();
+  if (!trimmed) return null;
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
 function Field({ label, required, children }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -59,11 +76,22 @@ function Field({ label, required, children }) {
   );
 }
 
-export default function EventAddModal({ isOpen, onClose, onCreated }) {
+export default function EventAddModal({ isOpen, onClose, onCreated, initialData = null, mode = 'add' }) {
   const user = getStoredUser();
-  const [form, setForm] = useState(() => initForm(user?.name));
-  const [tagInput, setTagInput] = useState('');
+  const [form, setForm] = useState(() =>
+    mode === 'edit' && initialData ? initialData : initForm(user?.name),
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (mode === 'edit' && initialData) {
+      setForm(initialData);
+    } else {
+      setForm(initForm(getStoredUser()?.name));
+    }
+    setIsSubmitting(false);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -71,35 +99,8 @@ export default function EventAddModal({ isOpen, onClose, onCreated }) {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
   };
 
-  const commitTag = () => {
-    const tag = tagInput.trim().replace(/^#/, '');
-    if (tag && !form.hashtags.includes(tag)) {
-      setForm((prev) => ({ ...prev, hashtags: [...prev.hashtags, tag] }));
-    }
-    setTagInput('');
-  };
-
-  const handleTagKeyDown = (event) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      commitTag();
-    }
-
-    if (event.key === 'Backspace' && tagInput === '') {
-      setForm((prev) => ({ ...prev, hashtags: prev.hashtags.slice(0, -1) }));
-    }
-  };
-
-  const removeTag = (tag) => {
-    setForm((prev) => ({
-      ...prev,
-      hashtags: prev.hashtags.filter((item) => item !== tag),
-    }));
-  };
-
   const resetAndClose = () => {
     setForm(initForm(user?.name));
-    setTagInput('');
     setIsSubmitting(false);
     onClose();
   };
@@ -113,13 +114,25 @@ export default function EventAddModal({ isOpen, onClose, onCreated }) {
       return;
     }
 
+    let photoDataUrl = null;
+    try {
+      if (typeof form.photo === 'string') {
+        photoDataUrl = form.photo;
+      } else {
+        photoDataUrl = await fileToDataUrl(form.photo);
+      }
+    } catch (error) {
+      alert(error.message);
+      return;
+    }
+
     const payload = {
       title: form.title.trim(),
       startDate: toApiDateTime(form.startDate),
       endDate: toApiDateTime(endDate),
       content: form.content.trim(),
-      photo: form.photo?.name ?? null,
-      link: form.link.trim() || null,
+      photo: photoDataUrl,
+      link: normalizeLink(form.link),
       note: form.note.trim() || null,
       grade: form.grade,
       notice: form.notice,
@@ -129,9 +142,14 @@ export default function EventAddModal({ isOpen, onClose, onCreated }) {
 
     setIsSubmitting(true);
 
+    const isEdit = mode === 'edit';
+    const url = isEdit
+      ? `${API_BASE_URL}/api/schedules/${initialData.scheduleId}`
+      : `${API_BASE_URL}/api/schedules`;
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/schedules`, {
-        method: 'POST',
+      const response = await fetch(url, {
+        method: isEdit ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
@@ -139,14 +157,14 @@ export default function EventAddModal({ isOpen, onClose, onCreated }) {
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(data.detail || data.message || '일정 등록에 실패했습니다.');
+        throw new Error(data.detail || data.message || (isEdit ? '일정 수정에 실패했습니다.' : '일정 등록에 실패했습니다.'));
       }
 
-      alert('일정이 등록되었습니다.');
+      alert(isEdit ? '일정이 수정되었습니다.' : '일정이 등록되었습니다.');
       onCreated?.(data);
       resetAndClose();
     } catch (error) {
-      alert(`일정 등록 실패\n${error.message}`);
+      alert(`${isEdit ? '일정 수정' : '일정 등록'} 실패\n${error.message}`);
       setIsSubmitting(false);
     }
   };
@@ -162,8 +180,12 @@ export default function EventAddModal({ isOpen, onClose, onCreated }) {
       >
         <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-6 py-4">
           <div>
-            <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-1">새 일정</p>
-            <h2 className="text-lg font-extrabold text-gray-800 leading-tight">새 일정 등록</h2>
+            <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-1">
+              {mode === 'edit' ? '일정 수정' : '새 일정'}
+            </p>
+            <h2 className="text-lg font-extrabold text-gray-800 leading-tight">
+              {mode === 'edit' ? '일정 수정' : '새 일정 등록'}
+            </h2>
             <p className="mt-0.5 text-xs text-gray-400">작성한 일정은 캘린더에 표시됩니다.</p>
           </div>
           <button
@@ -224,7 +246,9 @@ export default function EventAddModal({ isOpen, onClose, onCreated }) {
               <Field label="사진">
                 <label className="flex cursor-pointer select-none items-center gap-2 rounded-xl border border-dashed border-gray-300 px-4 py-3 text-sm transition-colors hover:border-indigo-400 hover:bg-indigo-50">
                   <span className="text-gray-500 truncate">
-                    {form.photo ? form.photo.name : '이미지 선택'}
+                    {form.photo
+                      ? typeof form.photo === 'string' ? '기존 이미지' : form.photo.name
+                      : '이미지 선택'}
                   </span>
                   <input
                     type="file"
@@ -238,7 +262,7 @@ export default function EventAddModal({ isOpen, onClose, onCreated }) {
               </Field>
               <Field label="링크">
                 <input
-                  type="url"
+                  type="text"
                   value={form.link}
                   onChange={set('link')}
                   placeholder="https://..."
@@ -290,38 +314,31 @@ export default function EventAddModal({ isOpen, onClose, onCreated }) {
             </div>
 
             <Field label="해시태그">
-              <div
-                className="flex min-h-[46px] w-full cursor-text flex-wrap items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 transition focus-within:border-transparent focus-within:ring-2 focus-within:ring-indigo-400"
-                onClick={() => document.getElementById('tag-input')?.focus()}
-              >
-                {form.hashtags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="flex items-center gap-1 rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-700"
-                  >
-                    #{tag}
+              <div className="flex flex-wrap gap-2">
+                {['공모전', '해커톤', '스터디', '프로젝트', '장학/취업'].map((tag) => {
+                  const isSelected = form.hashtags.includes(tag);
+                  return (
                     <button
+                      key={tag}
                       type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        removeTag(tag);
-                      }}
-                      className="leading-none text-indigo-400 hover:text-indigo-700"
+                      onClick={() =>
+                        setForm((prev) => ({
+                          ...prev,
+                          hashtags: isSelected
+                            ? prev.hashtags.filter((t) => t !== tag)
+                            : [...prev.hashtags, tag],
+                        }))
+                      }
+                      className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-all active:scale-95 ${
+                        isSelected
+                          ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
+                          : 'border-gray-300 bg-white text-gray-600 hover:border-indigo-400 hover:text-indigo-600'
+                      }`}
                     >
-                      x
+                      {tag}
                     </button>
-                  </span>
-                ))}
-                <input
-                  id="tag-input"
-                  type="text"
-                  value={tagInput}
-                  onChange={(event) => setTagInput(event.target.value)}
-                  onKeyDown={handleTagKeyDown}
-                  onBlur={commitTag}
-                  placeholder={form.hashtags.length === 0 ? 'Enter 또는 Space로 태그 추가' : ''}
-                  className="min-w-[140px] flex-1 bg-transparent text-sm outline-none placeholder-gray-300"
-                />
+                  );
+                })}
               </div>
             </Field>
 
@@ -359,7 +376,9 @@ export default function EventAddModal({ isOpen, onClose, onCreated }) {
             disabled={isSubmitting}
             className="rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-indigo-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-indigo-300"
           >
-            {isSubmitting ? '등록 중...' : '등록하기'}
+            {isSubmitting
+              ? (mode === 'edit' ? '수정 중...' : '등록 중...')
+              : (mode === 'edit' ? '수정하기' : '등록하기')}
           </button>
         </div>
       </div>

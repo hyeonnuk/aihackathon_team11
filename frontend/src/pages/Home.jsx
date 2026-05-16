@@ -5,7 +5,7 @@
 //  우측(30%): Daily Agenda — 목록(list) ↔ 상세(detail) 전환
 // ============================================================
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../App.css';
 import EventAddModal    from '../components/EventAddModal';
