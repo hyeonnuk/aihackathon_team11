@@ -14,7 +14,7 @@ const SCHEDULE_SYNC_INTERVAL_MS = 5000;
 
 const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
 const ALL_GRADES = ['1학년', '2학년', '3학년', '4학년'];
-const ALL_TAGS = ['공모전', '해커톤', '스터디', '프로젝트', '장학/취업'];
+const ALL_TAGS = ['공모전', '해커톤', '강의', '프로젝트', '장학/취업'];
 const NOTICE_COLOR = '#f8927d';
 
 const EVENTS_DATA = [
@@ -93,14 +93,14 @@ const EVENTS_DATA = [
   },
   {
     id: 'detail-4',
-    title: '알고리즘 스터디',
+    title: '알고리즘 강의',
     start: '2026-06-03',
     backgroundColor: '#34d399',
     borderColor: '#34d399',
     extendedProps: {
       grade: ['1학년', '2학년', '3학년', '4학년'],
-      tags: ['스터디'],
-      description: '매주 화요일 알고리즘 스터디. 이번 주 주제는 다이나믹 프로그래밍입니다.',
+      tags: ['강의'],
+      description: '매주 화요일 알고리즘 강의. 이번 주 주제는 다이나믹 프로그래밍입니다.',
       applyPeriod: null,
       applyEndDate: null,
       author: '최민준',
@@ -304,6 +304,36 @@ function getEventsForDate(events, dateStr) {
     if (!end || start === end) return start === dateStr;
     return dateStr >= start && dateStr < end;
   });
+}
+
+const MAX_VISIBLE_EVENTS = 3;
+
+function isNoticeEvent(event) {
+  return Boolean(event.extendedProps?.notice) || event.title?.startsWith('[공지]');
+}
+
+function sortAndLimitEvents(dayEvents) {
+  const notices = dayEvents.filter(isNoticeEvent);
+  const tagged = dayEvents.filter(
+    (e) => !isNoticeEvent(e) && (e.extendedProps?.tags?.length ?? 0) > 0,
+  );
+  const untagged = dayEvents.filter(
+    (e) => !isNoticeEvent(e) && !(e.extendedProps?.tags?.length > 0),
+  );
+  const prioritized = [...notices, ...tagged];
+  const visible = prioritized.slice(0, MAX_VISIBLE_EVENTS);
+  const hidden = [...prioritized.slice(MAX_VISIBLE_EVENTS), ...untagged];
+  return { visible, hidden };
+}
+
+function getInitialViewRange() {
+  const today = new Date();
+  const first = new Date(today.getFullYear(), today.getMonth(), 1);
+  const start = new Date(first);
+  start.setDate(start.getDate() - start.getDay());
+  const end = new Date(start);
+  end.setDate(end.getDate() + 42);
+  return { start, end };
 }
 
 function getDeadlineBadge(applyEndDate) {
@@ -766,6 +796,7 @@ export default function Home() {
   const [editTargetEvent, setEditTargetEvent] = useState(null);
   const [bookmarkedIds, setBookmarkedIds] = useState(loadBookmarks);
   const [toastMessage, setToastMessage] = useState('');
+  const [viewRange, setViewRange] = useState(getInitialViewRange);
 
   const hasActiveFilters = selectedGrades.length > 0 || selectedTags.length > 0 || showNoticeOnly;
 
@@ -866,6 +897,55 @@ export default function Home() {
     () => getEventsForDate(filteredCalendarEvents, selectedDate),
     [filteredCalendarEvents, selectedDate],
   );
+
+  const { calendarEvents, hiddenCounts } = useMemo(() => {
+    const visibleIds = new Set();
+    const hiddenCounts = {};
+
+    for (let d = new Date(viewRange.start); d < viewRange.end; d.setDate(d.getDate() + 1)) {
+      const dateStr = [
+        d.getFullYear(),
+        String(d.getMonth() + 1).padStart(2, '0'),
+        String(d.getDate()).padStart(2, '0'),
+      ].join('-');
+      const dayEvents = getEventsForDate(filteredCalendarEvents, dateStr);
+      const { visible, hidden } = sortAndLimitEvents(dayEvents);
+      visible.forEach((e) => visibleIds.add(e.id));
+      if (hidden.length > 0) hiddenCounts[dateStr] = hidden.length;
+    }
+
+    return {
+      calendarEvents: filteredCalendarEvents.filter((e) => visibleIds.has(e.id)),
+      hiddenCounts,
+    };
+  }, [filteredCalendarEvents, viewRange]);
+
+  // +N 버튼 DOM 관리용 refs
+  const injectedMoreBtns = useRef({});
+  const hiddenCountsRef = useRef({});
+  const handleMoreClickRef = useRef(null);
+
+  // 렌더마다 최신값을 ref에 동기화 (dayCellDidMount 클로저가 stale해지지 않도록)
+  hiddenCountsRef.current = hiddenCounts;
+  handleMoreClickRef.current = (dateStr) => {
+    setSelectedDate(dateStr);
+    setPanelView('list');
+    setDetailEventId(null);
+  };
+
+  // hiddenCounts가 바뀌면 이미 마운트된 셀의 버튼 텍스트/표시 동기화
+  useEffect(() => {
+    Object.entries(injectedMoreBtns.current).forEach(([dateStr, btn]) => {
+      const count = hiddenCounts[dateStr] ?? 0;
+      if (count > 0) {
+        btn.textContent = `+${count}`;
+        btn.style.display = '';
+      } else {
+        btn.style.display = 'none';
+      }
+    });
+  }, [hiddenCounts]);
+
   const detailEvent = detailEventId
     ? events.find((event) => event.id === detailEventId) ?? null
     : null;
@@ -1193,7 +1273,7 @@ export default function Home() {
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <section
-          className={`relative overflow-y-auto bg-white p-5 ${
+          className={`relative flex flex-col overflow-hidden bg-white p-5 ${
             hasActiveFilters ? 'calendar-has-filters' : ''
           } ${selectedDate === getTodayStr() ? 'calendar-viewing-today' : ''}`}
           style={{ flex: '7 7 0' }}
@@ -1216,16 +1296,79 @@ export default function Home() {
             </div>
           )}
 
+          <div className="min-h-0 flex-1 overflow-hidden">
           <FullCalendar
             ref={calendarRef}
             plugins={[dayGridPlugin, interactionPlugin]}
             initialView="dayGridMonth"
             locale="ko"
-            events={filteredCalendarEvents}
+            events={calendarEvents}
             dateClick={handleDateClick}
             eventClick={handleCalendarEventClick}
             eventCursor="pointer"
-            height="auto"
+            height="100%"
+            dayMaxEvents={false}
+            datesSet={(arg) => setViewRange({ start: arg.start, end: arg.end })}
+            eventOrder={(a, b) => {
+              const priority = (e) => {
+                if (e.extendedProps?.notice || e.title?.startsWith?.('[공지]')) return 0;
+                return (e.extendedProps?.tags?.length ?? 0) > 0 ? 1 : 2;
+              };
+              return priority(a) - priority(b);
+            }}
+            dayCellDidMount={(arg) => {
+              const d = arg.date;
+              const dateStr = [
+                d.getFullYear(),
+                String(d.getMonth() + 1).padStart(2, '0'),
+                String(d.getDate()).padStart(2, '0'),
+              ].join('-');
+              const frame = arg.el.querySelector('.fc-daygrid-day-frame') || arg.el;
+              const btn = document.createElement('button');
+              btn.style.cssText = [
+                'position:absolute',
+                'bottom:6px',
+                'right:8px',
+                'font-size:0.7rem',
+                'font-weight:700',
+                'color:#4f7cff',
+                'background:rgba(79,124,255,0.08)',
+                'border:none',
+                'border-radius:999px',
+                'padding:2px 8px',
+                'cursor:pointer',
+                'z-index:5',
+                'line-height:1.6',
+                'display:none',
+                'user-select:none',
+              ].join(';');
+              btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                handleMoreClickRef.current?.(dateStr);
+              });
+              btn.addEventListener('mouseenter', () => {
+                btn.style.background = 'rgba(79,124,255,0.18)';
+              });
+              btn.addEventListener('mouseleave', () => {
+                btn.style.background = 'rgba(79,124,255,0.08)';
+              });
+              frame.appendChild(btn);
+              injectedMoreBtns.current[dateStr] = btn;
+              const count = hiddenCountsRef.current[dateStr] ?? 0;
+              if (count > 0) {
+                btn.textContent = `+${count}`;
+                btn.style.display = '';
+              }
+            }}
+            dayCellWillUnmount={(arg) => {
+              const d = arg.date;
+              const dateStr = [
+                d.getFullYear(),
+                String(d.getMonth() + 1).padStart(2, '0'),
+                String(d.getDate()).padStart(2, '0'),
+              ].join('-');
+              delete injectedMoreBtns.current[dateStr];
+            }}
             customButtons={{
               filterBtn: {
                 text: '필터',
@@ -1285,6 +1428,7 @@ export default function Home() {
               </div>
             )}
           />
+          </div>
         </section>
 
         <aside

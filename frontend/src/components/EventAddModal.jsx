@@ -374,7 +374,7 @@ export default function EventAddModal({ isOpen, onClose, onCreated, initialData 
 
             <Field label="해시태그">
               <div className="flex flex-wrap gap-2">
-                {['공모전', '해커톤', '스터디', '프로젝트', '장학/취업'].map((tag) => {
+                {['공모전', '해커톤', '강의', '프로젝트', '장학/취업'].map((tag) => {
                   const isSelected = form.hashtags.includes(tag);
                   return (
                     <button
