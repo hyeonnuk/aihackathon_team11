@@ -81,7 +81,6 @@ export default function EventAddModal({ isOpen, onClose, onCreated, initialData 
   const [form, setForm] = useState(() =>
     mode === 'edit' && initialData ? initialData : initForm(user?.name),
   );
-  const [tagInput, setTagInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -91,7 +90,6 @@ export default function EventAddModal({ isOpen, onClose, onCreated, initialData 
     } else {
       setForm(initForm(getStoredUser()?.name));
     }
-    setTagInput('');
     setIsSubmitting(false);
   }, [isOpen]);
 
@@ -101,35 +99,8 @@ export default function EventAddModal({ isOpen, onClose, onCreated, initialData 
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
   };
 
-  const commitTag = () => {
-    const tag = tagInput.trim().replace(/^#/, '');
-    if (tag && !form.hashtags.includes(tag)) {
-      setForm((prev) => ({ ...prev, hashtags: [...prev.hashtags, tag] }));
-    }
-    setTagInput('');
-  };
-
-  const handleTagKeyDown = (event) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      commitTag();
-    }
-
-    if (event.key === 'Backspace' && tagInput === '') {
-      setForm((prev) => ({ ...prev, hashtags: prev.hashtags.slice(0, -1) }));
-    }
-  };
-
-  const removeTag = (tag) => {
-    setForm((prev) => ({
-      ...prev,
-      hashtags: prev.hashtags.filter((item) => item !== tag),
-    }));
-  };
-
   const resetAndClose = () => {
     setForm(initForm(user?.name));
-    setTagInput('');
     setIsSubmitting(false);
     onClose();
   };
@@ -374,38 +345,31 @@ export default function EventAddModal({ isOpen, onClose, onCreated, initialData 
             </div>
 
             <Field label="해시태그">
-              <div
-                className="flex min-h-[46px] w-full cursor-text flex-wrap items-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 transition focus-within:border-transparent focus-within:ring-2 focus-within:ring-indigo-400"
-                onClick={() => document.getElementById('tag-input')?.focus()}
-              >
-                {form.hashtags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="flex items-center gap-1 rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-semibold text-indigo-700"
-                  >
-                    #{tag}
+              <div className="flex flex-wrap gap-2">
+                {['공모전', '해커톤', '스터디', '프로젝트', '장학/취업'].map((tag) => {
+                  const isSelected = form.hashtags.includes(tag);
+                  return (
                     <button
+                      key={tag}
                       type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        removeTag(tag);
-                      }}
-                      className="leading-none text-indigo-400 hover:text-indigo-700"
+                      onClick={() =>
+                        setForm((prev) => ({
+                          ...prev,
+                          hashtags: isSelected
+                            ? prev.hashtags.filter((t) => t !== tag)
+                            : [...prev.hashtags, tag],
+                        }))
+                      }
+                      className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-all active:scale-95 ${
+                        isSelected
+                          ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
+                          : 'border-gray-300 bg-white text-gray-600 hover:border-indigo-400 hover:text-indigo-600'
+                      }`}
                     >
-                      x
+                      {tag}
                     </button>
-                  </span>
-                ))}
-                <input
-                  id="tag-input"
-                  type="text"
-                  value={tagInput}
-                  onChange={(event) => setTagInput(event.target.value)}
-                  onKeyDown={handleTagKeyDown}
-                  onBlur={commitTag}
-                  placeholder={form.hashtags.length === 0 ? 'Enter 또는 Space로 태그 추가' : ''}
-                  className="min-w-[140px] flex-1 bg-transparent text-sm outline-none placeholder-gray-300"
-                />
+                  );
+                })}
               </div>
             </Field>
 
