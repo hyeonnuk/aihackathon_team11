@@ -327,6 +327,8 @@ export default function EventDetailPanel({
   onReplyReact,
   onEdit,
   onDelete,
+  isBookmarked,
+  onBookmark,
   highlightedCommentId,
   user,
 }) {
@@ -486,6 +488,22 @@ export default function EventDetailPanel({
             일정 목록으로
           </button>
           <div className="flex items-center gap-1">
+            {onBookmark && (
+              <button
+                onClick={onBookmark}
+                className="group/bm flex items-center justify-center rounded-full p-1.5 transition-all active:scale-90 hover:bg-red-50"
+                title={isBookmarked ? '관심 해제' : '관심 등록'}
+              >
+                <svg
+                  className={`h-4 w-4 transition-all ${isBookmarked ? 'fill-red-500 text-red-500 scale-110' : 'fill-none text-gray-300 group-hover/bm:text-red-400'}`}
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+              </button>
+            )}
             {onEdit && (
               <button
                 onClick={onEdit}

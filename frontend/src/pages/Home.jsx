@@ -344,18 +344,87 @@ function getReactionUpdate(currentProps, reaction) {
   return { nextProps, deltas };
 }
 
-function AgendaCard({ event, isLast, onDetail }) {
+// ── 북마크 helpers ───────────────────────────────────────────
+
+function loadBookmarks() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem('bookmarkedEventIds') ?? '[]'));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveBookmarks(ids) {
+  localStorage.setItem('bookmarkedEventIds', JSON.stringify([...ids]));
+}
+
+function getDdayDiff(applyEndDate, startDate) {
+  const ref = applyEndDate || startDate;
+  if (!ref) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.ceil((new Date(`${ref}T00:00:00`) - today) / 86_400_000);
+}
+
+function DdayBadge({ applyEndDate, startDate }) {
+  const diff = getDdayDiff(applyEndDate, startDate);
+  if (diff === null) return null;
+  if (diff < 0)
+    return <span className="rounded-full bg-gray-200 px-2 py-0.5 text-[10px] font-bold text-gray-500">마감</span>;
+  if (diff === 0)
+    return <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-600">D-DAY</span>;
+  if (diff <= 7)
+    return <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-600">D-{diff}</span>;
+  return <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-700">D-{diff}</span>;
+}
+
+function BookmarkButton({ isBookmarked, onClick, size = 'sm' }) {
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      className="group/bm flex items-center justify-center rounded-full p-1.5 transition-all active:scale-90 hover:bg-red-50"
+      title={isBookmarked ? '관심 해제' : '관심 등록'}
+    >
+      <svg
+        className={`transition-all ${size === 'md' ? 'w-5 h-5' : 'w-4 h-4'} ${
+          isBookmarked
+            ? 'text-red-500 fill-red-500 scale-110'
+            : 'text-gray-300 fill-none group-hover/bm:text-red-400'
+        }`}
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={2}
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+      </svg>
+    </button>
+  );
+}
+
+function Toast({ message, onDismiss }) {
+  useEffect(() => {
+    if (!message) return;
+    const t = setTimeout(onDismiss, 2500);
+    return () => clearTimeout(t);
+  }, [message]);
+
+  if (!message) return null;
+  return (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] px-5 py-2.5 rounded-xl bg-gray-800 text-white text-sm font-medium shadow-lg pointer-events-none">
+      {message}
+    </div>
+  );
+}
+
+function AgendaCard({ event, isLast, onDetail, isBookmarked, onBookmark }) {
   const { description, tags, applyEndDate, author } = event.extendedProps;
   const badge = getDeadlineBadge(applyEndDate);
 
   return (
     <div>
-      <button
-        className="group flex w-full gap-3 rounded-lg py-4 text-left transition-colors hover:bg-primary-50/60"
-        onClick={onDetail}
-      >
+      <div className="group flex w-full gap-3 rounded-lg py-4">
         <div className="w-1 shrink-0 rounded-full self-stretch" style={{ backgroundColor: event.backgroundColor }} />
-        <div className="min-w-0 flex-1">
+        <button className="min-w-0 flex-1 text-left" onClick={onDetail}>
           <div className="mb-0.5 flex flex-wrap items-center gap-1.5">
             <p className="text-sm font-semibold leading-snug text-gray-800">{event.title}</p>
             {badge === 'closed' && (
@@ -390,14 +459,118 @@ function AgendaCard({ event, isLast, onDetail }) {
               </span>
             ))}
           </div>
+        </button>
+        <div className="flex shrink-0 items-center gap-0.5">
+          <BookmarkButton isBookmarked={isBookmarked} onClick={onBookmark} />
+          <button
+            onClick={onDetail}
+            className="flex items-center p-1 text-gray-300 transition-colors group-hover:text-primary-400"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
         </div>
-        <div className="flex shrink-0 items-center text-gray-300 transition-colors group-hover:text-primary-400">
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </div>
-      </button>
+      </div>
       {!isLast && <div className="h-px bg-gray-100" />}
+    </div>
+  );
+}
+
+function BookmarkCard({ event, isLast, onDetail, onToggleBookmark }) {
+  const ep = event.extendedProps;
+  return (
+    <div>
+      <div className="group flex w-full gap-3 py-4">
+        <div className="w-1 shrink-0 rounded-full self-stretch" style={{ backgroundColor: event.backgroundColor }} />
+        <button className="min-w-0 flex-1 text-left" onClick={onDetail}>
+          <div className="mb-0.5 flex flex-wrap items-center gap-1.5">
+            <p className="text-sm font-semibold leading-snug text-gray-800">{event.title}</p>
+            <DdayBadge applyEndDate={ep.applyEndDate} startDate={event.start} />
+          </div>
+          <p className="mt-0.5 text-xs text-gray-400">📅 {event.start}</p>
+          {ep.applyPeriod && <p className="text-xs text-gray-400">📋 {ep.applyPeriod}</p>}
+          {ep.author && <p className="mt-1 text-xs text-gray-400">작성자 {ep.author}</p>}
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {ep.tags.map((tag) => (
+              <span
+                key={tag}
+                className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                style={{
+                  backgroundColor: '#ffffff',
+                  border: `1px solid ${TAG_CHIP_COLORS[tag] ?? event.backgroundColor}`,
+                  color: TAG_CHIP_COLORS[tag] ?? event.backgroundColor,
+                }}
+              >
+                #{tag}
+              </span>
+            ))}
+          </div>
+        </button>
+        <div className="flex shrink-0 items-start pt-1">
+          <BookmarkButton isBookmarked onClick={onToggleBookmark} />
+        </div>
+      </div>
+      {!isLast && <div className="h-px bg-gray-100" />}
+    </div>
+  );
+}
+
+function BookmarkPanel({ events, bookmarkedIds, onDetail, onToggleBookmark, onClose }) {
+  const bookmarkedEvents = events
+    .filter((e) => bookmarkedIds.has(e.id))
+    .sort((a, b) => {
+      const da = getDdayDiff(a.extendedProps.applyEndDate, a.start);
+      const db = getDdayDiff(b.extendedProps.applyEndDate, b.start);
+      if (da === null && db === null) return 0;
+      if (da === null) return 1;
+      if (db === null) return -1;
+      return da - db;
+    });
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="shrink-0 border-b border-gray-200 bg-gray-50 px-6 pb-4 pt-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="mb-1 text-xs font-bold uppercase tracking-widest text-red-400">Bookmarks</p>
+            <h2 className="flex items-center gap-2 text-2xl font-extrabold leading-tight text-gray-800">
+              관심 일정
+              {bookmarkedEvents.length > 0 && (
+                <span className="rounded-full bg-red-500 px-2 py-0.5 text-sm font-bold text-white">
+                  {bookmarkedEvents.length}
+                </span>
+              )}
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-xs font-semibold text-gray-400 hover:text-gray-700 transition-colors"
+          >
+            목록으로 →
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-6 py-2">
+        {bookmarkedEvents.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center py-16 text-center">
+            <div className="mb-3 text-4xl">♡</div>
+            <p className="text-sm font-semibold text-gray-500">관심 일정이 없습니다.</p>
+            <p className="mt-1.5 text-xs text-gray-400">일정에서 하트를 눌러 추가해보세요.</p>
+          </div>
+        ) : (
+          bookmarkedEvents.map((event, index) => (
+            <BookmarkCard
+              key={event.id}
+              event={event}
+              isLast={index === bookmarkedEvents.length - 1}
+              onDetail={() => onDetail(event.id)}
+              onToggleBookmark={() => onToggleBookmark(event.id)}
+            />
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -540,6 +713,8 @@ export default function Home() {
   const [detailEventId, setDetailEventId] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editTargetEvent, setEditTargetEvent] = useState(null);
+  const [bookmarkedIds, setBookmarkedIds] = useState(loadBookmarks);
+  const [toastMessage, setToastMessage] = useState('');
 
   const hasActiveFilters = selectedGrades.length > 0 || selectedTags.length > 0 || showNoticeOnly;
 
@@ -668,6 +843,20 @@ export default function Home() {
       });
       alert(`일정 삭제 실패\n${error.message}`);
     }
+  };
+
+  const handleToggleBookmark = (eventId) => {
+    if (!user) {
+      setToastMessage('로그인이 필요한 기능입니다.');
+      return;
+    }
+    setBookmarkedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(eventId)) next.delete(eventId);
+      else next.add(eventId);
+      saveBookmarks(next);
+      return next;
+    });
   };
 
   const handleEventReaction = async (eventId, reaction) => {
@@ -952,12 +1141,43 @@ export default function Home() {
           className="flex flex-col overflow-hidden border-l border-gray-200 bg-gray-50"
           style={{ flex: '3 3 0' }}
         >
-          {panelView === 'list' ? (
+          {panelView === 'bookmarks' ? (
+            <BookmarkPanel
+              events={events}
+              bookmarkedIds={bookmarkedIds}
+              onDetail={(eventId) => { setDetailEventId(eventId); setPanelView('detail'); }}
+              onToggleBookmark={handleToggleBookmark}
+              onClose={() => setPanelView('list')}
+            />
+          ) : panelView === 'list' ? (
             <div className="flex h-full flex-col overflow-hidden">
               <div className="shrink-0 border-b border-gray-200 bg-gray-50 px-6 pb-4 pt-6">
-                <p className="mb-1 text-xs font-bold uppercase tracking-widest text-primary-500">
-                  Daily Agenda
-                </p>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-bold uppercase tracking-widest text-primary-500">
+                    Daily Agenda
+                  </p>
+                  <button
+                    onClick={() => setPanelView('bookmarks')}
+                    className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all hover:bg-red-50"
+                  >
+                    <svg
+                      className={`h-4 w-4 transition-all ${bookmarkedIds.size > 0 ? 'fill-red-500 text-red-500' : 'fill-none text-gray-400'}`}
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                    </svg>
+                    <span className={bookmarkedIds.size > 0 ? 'text-red-500' : 'text-gray-400'}>
+                      관심 일정
+                    </span>
+                    {bookmarkedIds.size > 0 && (
+                      <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                        {bookmarkedIds.size}
+                      </span>
+                    )}
+                  </button>
+                </div>
                 <h2 className="text-2xl font-extrabold leading-tight text-gray-800">
                   {formatDateLabel(selectedDate)}
                 </h2>
@@ -982,6 +1202,8 @@ export default function Home() {
                       event={event}
                       isLast={index === agendaEvents.length - 1}
                       onDetail={() => handleShowDetail(event.id)}
+                      isBookmarked={bookmarkedIds.has(event.id)}
+                      onBookmark={() => handleToggleBookmark(event.id)}
                     />
                   ))
                 )}
@@ -998,6 +1220,8 @@ export default function Home() {
               onAddComment={(content) => handleAddComment(detailEventId, content)}
               onEdit={user ? () => handleOpenEdit(detailEventId) : undefined}
               onDelete={user ? () => handleDeleteEvent(detailEventId) : undefined}
+              isBookmarked={bookmarkedIds.has(detailEventId)}
+              onBookmark={() => handleToggleBookmark(detailEventId)}
               highlightedCommentId={searchParams.get('commentId')}
               user={user}
             />
@@ -1019,6 +1243,8 @@ export default function Home() {
         mode="edit"
         initialData={editTargetEvent ? buildEditInitialData(editTargetEvent) : null}
       />
+
+      <Toast message={toastMessage} onDismiss={() => setToastMessage('')} />
     </div>
   );
 }
