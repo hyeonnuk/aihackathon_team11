@@ -21,7 +21,6 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_NAME = os.getenv("DB_NAME", "synccs")
 JWT_SECRET = os.getenv("JWT_SECRET", "change-this-secret")
 JWT_EXPIRES_MINUTES = int(os.getenv("JWT_EXPIRES_MINUTES", "120"))
-MASTER_CREATE_KEY = os.getenv("MASTER_CREATE_KEY", "")
 CLIENT_ORIGINS = [
     origin.strip()
     for origin in os.getenv("CLIENT_ORIGINS", "http://localhost:5173").split(",")
@@ -83,18 +82,6 @@ class SignupRequest(BaseModel):
         if normalized not in gender_map:
             raise ValueError("must be male, female, or other")
         return gender_map[normalized]
-
-
-class MasterSignupRequest(SignupRequest):
-    masterCreateKey: str = Field(min_length=1)
-
-    @field_validator("masterCreateKey")
-    @classmethod
-    def strip_master_create_key(cls, value: str) -> str:
-        value = value.strip()
-        if not value:
-            raise ValueError("must not be blank")
-        return value
 
 
 class UserRoleUpdateRequest(BaseModel):
@@ -790,18 +777,7 @@ def signup(payload: SignupRequest):
 
 
 @app.post("/api/auth/master", status_code=status.HTTP_201_CREATED)
-def create_master_user(payload: MasterSignupRequest):
-    if not MASTER_CREATE_KEY:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="MASTER_CREATE_KEY is not configured.",
-        )
-    if payload.masterCreateKey != MASTER_CREATE_KEY:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Invalid master create key.",
-        )
-
+def create_master_user(payload: SignupRequest):
     password_hash = hash_password(payload.password)
     role = "master"
 
