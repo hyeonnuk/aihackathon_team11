@@ -20,3 +20,25 @@ CREATE TABLE IF NOT EXISTS users (
   UNIQUE KEY uk_users_email (email),
   UNIQUE KEY uk_users_login_id (login_id)
 );
+
+CREATE TABLE IF NOT EXISTS schedules (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  title VARCHAR(100) NOT NULL,
+  start_date DATETIME NOT NULL,
+  end_date DATETIME NOT NULL,
+  content TEXT NOT NULL,
+  photo VARCHAR(500) NULL,
+  link VARCHAR(500) NULL,
+  note TEXT NULL,
+  grade ENUM('1', '2', '3', '4', 'all') NOT NULL,
+  notice BOOLEAN NOT NULL DEFAULT FALSE,
+  hashtag VARCHAR(255) NULL,
+  author VARCHAR(50) NOT NULL,
+  like_count INT UNSIGNED NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  INDEX idx_schedules_start_date (start_date),
+  INDEX idx_schedules_grade (grade),
+  INDEX idx_schedules_notice (notice)
+);

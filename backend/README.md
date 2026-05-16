@@ -65,3 +65,31 @@ POST /api/auth/login
   "password": "password123"
 }
 ```
+
+### Schedules
+
+```http
+GET /api/schedules
+GET /api/schedules/{schedule_id}
+POST /api/schedules
+PUT /api/schedules/{schedule_id}
+DELETE /api/schedules/{schedule_id}
+```
+
+Create schedule example:
+
+```json
+{
+  "title": "교내 해커톤",
+  "startDate": "2026-05-20 09:00:00",
+  "endDate": "2026-05-22 18:00:00",
+  "content": "팀 프로젝트 해커톤 일정입니다.",
+  "photo": null,
+  "link": "https://example.com",
+  "note": null,
+  "grade": "all",
+  "notice": true,
+  "hashtag": "#hackathon #team",
+  "author": "admin"
+}
+```

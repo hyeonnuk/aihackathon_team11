@@ -10,7 +10,7 @@ from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from mysql.connector import pooling
 from mysql.connector.errors import IntegrityError
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 
 load_dotenv()
 
@@ -97,6 +97,107 @@ class LoginRequest(BaseModel):
         return value
 
 
+class ScheduleCreateRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=100)
+    startDate: datetime
+    endDate: datetime
+    content: str = Field(min_length=1)
+    photo: str | None = Field(default=None, max_length=500)
+    link: str | None = Field(default=None, max_length=500)
+    note: str | None = None
+    grade: str = Field(min_length=1, max_length=10)
+    notice: bool = False
+    hashtag: str | None = Field(default=None, max_length=255)
+    author: str = Field(min_length=1, max_length=50)
+
+    @field_validator("title", "content", "author")
+    @classmethod
+    def strip_required_text(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("must not be blank")
+        return value
+
+    @field_validator("photo", "link", "note", "hashtag")
+    @classmethod
+    def strip_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+    @field_validator("grade")
+    @classmethod
+    def normalize_grade(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        grade_map = {
+            "1": "1",
+            "1학년": "1",
+            "2": "2",
+            "2학년": "2",
+            "3": "3",
+            "3학년": "3",
+            "4": "4",
+            "4학년": "4",
+            "all": "all",
+            "전체": "all",
+        }
+        if normalized not in grade_map:
+            raise ValueError("grade must be 1, 2, 3, 4, or all")
+        return grade_map[normalized]
+
+    @model_validator(mode="after")
+    def validate_date_range(self):
+        if self.endDate < self.startDate:
+            raise ValueError("endDate must be greater than or equal to startDate")
+        return self
+
+
+class ScheduleUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=100)
+    startDate: datetime | None = None
+    endDate: datetime | None = None
+    content: str | None = Field(default=None, min_length=1)
+    photo: str | None = Field(default=None, max_length=500)
+    link: str | None = Field(default=None, max_length=500)
+    note: str | None = None
+    grade: str | None = Field(default=None, min_length=1, max_length=10)
+    notice: bool | None = None
+    hashtag: str | None = Field(default=None, max_length=255)
+    author: str | None = Field(default=None, min_length=1, max_length=50)
+
+    @field_validator("title", "content", "author")
+    @classmethod
+    def strip_optional_required_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        if not value:
+            raise ValueError("must not be blank")
+        return value
+
+    @field_validator("photo", "link", "note", "hashtag")
+    @classmethod
+    def strip_update_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+    @field_validator("grade")
+    @classmethod
+    def normalize_update_grade(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return ScheduleCreateRequest.normalize_grade(value)
+
+    @model_validator(mode="after")
+    def validate_update_date_range(self):
+        if self.startDate is not None and self.endDate is not None and self.endDate < self.startDate:
+            raise ValueError("endDate must be greater than or equal to startDate")
+        return self
+
+
 def create_database_if_needed() -> None:
     try:
         connection = mysql.connector.connect(
@@ -167,6 +268,31 @@ def init_tables() -> None:
             )
             """
         )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schedules (
+              id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+              title VARCHAR(100) NOT NULL,
+              start_date DATETIME NOT NULL,
+              end_date DATETIME NOT NULL,
+              content TEXT NOT NULL,
+              photo VARCHAR(500) NULL,
+              link VARCHAR(500) NULL,
+              note TEXT NULL,
+              grade ENUM('1', '2', '3', '4', 'all') NOT NULL,
+              notice BOOLEAN NOT NULL DEFAULT FALSE,
+              hashtag VARCHAR(255) NULL,
+              author VARCHAR(50) NOT NULL,
+              like_count INT UNSIGNED NOT NULL DEFAULT 0,
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+              PRIMARY KEY (id),
+              INDEX idx_schedules_start_date (start_date),
+              INDEX idx_schedules_grade (grade),
+              INDEX idx_schedules_notice (notice)
+            )
+            """
+        )
         connection.commit()
     finally:
         cursor.close()
@@ -199,6 +325,30 @@ def to_user_response(row: dict) -> dict:
         "phoneNumber": row["phone_number"],
         "email": row["email"],
         "loginId": row["login_id"],
+    }
+
+
+def serialize_datetime(value):
+    return value.isoformat(sep=" ") if value else None
+
+
+def to_schedule_response(row: dict) -> dict:
+    return {
+        "id": row["id"],
+        "title": row["title"],
+        "startDate": serialize_datetime(row["start_date"]),
+        "endDate": serialize_datetime(row["end_date"]),
+        "content": row["content"],
+        "photo": row["photo"],
+        "link": row["link"],
+        "note": row["note"],
+        "grade": row["grade"],
+        "notice": bool(row["notice"]),
+        "hashtag": row["hashtag"],
+        "author": row["author"],
+        "likeCount": row["like_count"],
+        "createdAt": serialize_datetime(row["created_at"]),
+        "updatedAt": serialize_datetime(row["updated_at"]),
     }
 
 
@@ -357,4 +507,214 @@ def list_signup_users():
             }
             for user in users
         ],
+    }
+
+
+@app.get("/api/schedules")
+def list_schedules():
+    try:
+        connection = get_connection()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            cursor.execute(
+                """
+                SELECT id, title, start_date, end_date, content, photo, link, note,
+                       grade, notice, hashtag, author, like_count, created_at, updated_at
+                FROM schedules
+                ORDER BY start_date ASC, id ASC
+                """
+            )
+            schedules = cursor.fetchall()
+        finally:
+            cursor.close()
+            connection.close()
+    except mysql.connector.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to load schedules.",
+        )
+
+    return {
+        "count": len(schedules),
+        "schedules": [to_schedule_response(schedule) for schedule in schedules],
+    }
+
+
+@app.get("/api/schedules/{schedule_id}")
+def get_schedule(schedule_id: int):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            cursor.execute(
+                """
+                SELECT id, title, start_date, end_date, content, photo, link, note,
+                       grade, notice, hashtag, author, like_count, created_at, updated_at
+                FROM schedules
+                WHERE id = %s
+                LIMIT 1
+                """,
+                (schedule_id,),
+            )
+            schedule = cursor.fetchone()
+        finally:
+            cursor.close()
+            connection.close()
+    except mysql.connector.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to load schedule.",
+        )
+
+    if not schedule:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Schedule not found.",
+        )
+
+    return {"schedule": to_schedule_response(schedule)}
+
+
+@app.post("/api/schedules", status_code=status.HTTP_201_CREATED)
+def create_schedule(payload: ScheduleCreateRequest):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
+        try:
+            cursor.execute(
+                """
+                INSERT INTO schedules
+                  (title, start_date, end_date, content, photo, link, note,
+                   grade, notice, hashtag, author)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    payload.title,
+                    payload.startDate,
+                    payload.endDate,
+                    payload.content,
+                    payload.photo,
+                    payload.link,
+                    payload.note,
+                    payload.grade,
+                    payload.notice,
+                    payload.hashtag,
+                    payload.author,
+                ),
+            )
+            connection.commit()
+            schedule_id = cursor.lastrowid
+        finally:
+            cursor.close()
+            connection.close()
+    except mysql.connector.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create schedule.",
+        )
+
+    return {
+        "message": "Schedule created.",
+        "id": schedule_id,
+    }
+
+
+@app.put("/api/schedules/{schedule_id}")
+def update_schedule(schedule_id: int, payload: ScheduleUpdateRequest):
+    updates = payload.model_dump(exclude_unset=True)
+    if not updates:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No fields to update.",
+        )
+
+    column_map = {
+        "title": "title",
+        "startDate": "start_date",
+        "endDate": "end_date",
+        "content": "content",
+        "photo": "photo",
+        "link": "link",
+        "note": "note",
+        "grade": "grade",
+        "notice": "notice",
+        "hashtag": "hashtag",
+        "author": "author",
+    }
+
+    try:
+        connection = get_connection()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            cursor.execute(
+                "SELECT start_date, end_date FROM schedules WHERE id = %s LIMIT 1",
+                (schedule_id,),
+            )
+            current_schedule = cursor.fetchone()
+            if not current_schedule:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Schedule not found.",
+                )
+
+            next_start = updates.get("startDate", current_schedule["start_date"])
+            next_end = updates.get("endDate", current_schedule["end_date"])
+            if next_end < next_start:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="endDate must be greater than or equal to startDate.",
+                )
+
+            set_clause = ", ".join(f"{column_map[field]} = %s" for field in updates)
+            values = [updates[field] for field in updates]
+            values.append(schedule_id)
+            cursor.execute(
+                f"UPDATE schedules SET {set_clause} WHERE id = %s",
+                values,
+            )
+            connection.commit()
+        finally:
+            cursor.close()
+            connection.close()
+    except HTTPException:
+        raise
+    except mysql.connector.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update schedule.",
+        )
+
+    return {
+        "message": "Schedule updated.",
+        "id": schedule_id,
+    }
+
+
+@app.delete("/api/schedules/{schedule_id}")
+def delete_schedule(schedule_id: int):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
+        try:
+            cursor.execute("DELETE FROM schedules WHERE id = %s", (schedule_id,))
+            connection.commit()
+            deleted_count = cursor.rowcount
+        finally:
+            cursor.close()
+            connection.close()
+    except mysql.connector.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete schedule.",
+        )
+
+    if deleted_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Schedule not found.",
+        )
+
+    return {
+        "message": "Schedule deleted.",
+        "id": schedule_id,
     }
