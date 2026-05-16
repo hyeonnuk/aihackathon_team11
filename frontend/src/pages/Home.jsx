@@ -5,11 +5,12 @@
 //  우측(30%): Daily Agenda — 목록(list) ↔ 상세(detail) 전환
 // ============================================================
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../App.css';
 import EventAddModal    from '../components/EventAddModal';
 import EventDetailPanel from '../components/EventDetailPanel';
+import { TAG_COLORS, TAG_TEXT_COLORS, TAG_CHIP_COLORS, getTagColor } from '../constants/tagColors';
 import FullCalendar     from '@fullcalendar/react';
 import dayGridPlugin    from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
@@ -51,17 +52,17 @@ function getStoredUser() {
 const ALL_GRADES = ['1학년', '2학년', '3학년', '4학년'];
 const ALL_TAGS   = ['공모전', '해커톤', '스터디', '프로젝트', '장학/취업'];
 
+
 // ── 이벤트 초기 데이터 ─────────────────────────────────────────
 // extendedProps 에 grade, tags, description, applyPeriod, applyEndDate,
 // author, applyLink, likes, dislikes, userReaction, comments 포함
+// EVENTS_DATA의 backgroundColor/borderColor는 아래 EVENTS에서 태그 기반으로 자동 적용됨
 const EVENTS_DATA = [
   {
     id: '1',
     title: '교내 웹 해커톤',
     start: '2026-05-20',
-    end: '2026-05-23',           // end exclusive → 실제 마감 22일
-    backgroundColor: '#818cf8',
-    borderColor:     '#818cf8',
+    end: '2026-05-23',
     extendedProps: {
       grade: ['2학년', '3학년', '4학년'],
       tags: ['해커톤', '프로젝트'],
@@ -82,8 +83,6 @@ const EVENTS_DATA = [
     title: '기말 프로젝트 발표',
     start: '2026-05-25',
     end: '2026-05-27',
-    backgroundColor: '#fb7185',
-    borderColor:     '#fb7185',
     extendedProps: {
       grade: ['1학년', '2학년', '3학년', '4학년'],
       tags: ['프로젝트'],
@@ -102,8 +101,6 @@ const EVENTS_DATA = [
     id: '3',
     title: '카카오 코딩테스트',
     start: '2026-05-28',
-    backgroundColor: '#fbbf24',
-    borderColor:     '#fbbf24',
     extendedProps: {
       grade: ['3학년', '4학년'],
       tags: ['장학/취업'],
@@ -120,8 +117,6 @@ const EVENTS_DATA = [
     id: '4',
     title: '알고리즘 스터디',
     start: '2026-06-03',
-    backgroundColor: '#34d399',
-    borderColor:     '#34d399',
     extendedProps: {
       grade: ['1학년', '2학년', '3학년', '4학년'],
       tags: ['스터디'],
@@ -141,8 +136,6 @@ const EVENTS_DATA = [
     title: 'Google ML Bootcamp',
     start: '2026-06-05',
     end: '2026-06-08',
-    backgroundColor: '#60a5fa',
-    borderColor:     '#60a5fa',
     extendedProps: {
       grade: ['2학년', '3학년', '4학년'],
       tags: ['공모전', '프로젝트'],
@@ -162,8 +155,6 @@ const EVENTS_DATA = [
     id: '6',
     title: '장학금 신청 마감',
     start: '2026-05-31',
-    backgroundColor: '#a78bfa',
-    borderColor:     '#a78bfa',
     extendedProps: {
       grade: ['1학년', '2학년', '3학년', '4학년'],
       tags: ['장학/취업'],
@@ -180,8 +171,6 @@ const EVENTS_DATA = [
     id: '7',
     title: '앱 공모전 접수 마감',
     start: '2026-06-10',
-    backgroundColor: '#f472b6',
-    borderColor:     '#f472b6',
     extendedProps: {
       grade: ['1학년', '2학년', '3학년'],
       tags: ['공모전'],
@@ -195,6 +184,13 @@ const EVENTS_DATA = [
     },
   },
 ];
+
+// 태그 색상 주입 함수 — 렌더 시마다 최신 TAG_COLORS 사용
+function applyTagColors(ev) {
+  const color     = getTagColor(ev.extendedProps.tags);
+  const textColor = TAG_TEXT_COLORS[ev.extendedProps.tags?.[0]] ?? '#383642';
+  return { ...ev, backgroundColor: color, borderColor: color, textColor };
+}
 
 // ── 필터 함수 ──────────────────────────────────────────────────
 function getFilteredEvents(events, selectedGrades, selectedTags) {
@@ -220,7 +216,7 @@ function AgendaCard({ event, isLast, onDetail }) {
   return (
     <div>
       <button
-        className="w-full text-left py-4 flex gap-3 items-stretch hover:bg-indigo-50/60 transition-colors rounded-lg group"
+        className="w-full text-left py-4 flex gap-3 items-stretch hover:bg-primary-50/60 transition-colors rounded-lg group"
         onClick={onDetail}
       >
         {/* 색상 인디케이터 */}
@@ -254,7 +250,7 @@ function AgendaCard({ event, isLast, onDetail }) {
               <span
                 key={tag}
                 className="px-2 py-0.5 text-[10px] font-medium rounded-full"
-                style={{ backgroundColor: event.backgroundColor + '22', color: event.backgroundColor }}
+                style={{ backgroundColor: '#ffffff', border: `1px solid ${TAG_CHIP_COLORS[tag] ?? event.backgroundColor}`, color: TAG_CHIP_COLORS[tag] ?? event.backgroundColor }}
               >
                 #{tag}
               </span>
@@ -263,7 +259,7 @@ function AgendaCard({ event, isLast, onDetail }) {
         </div>
 
         {/* 화살표 */}
-        <div className="flex items-center text-gray-300 group-hover:text-indigo-400 shrink-0 transition-colors">
+        <div className="flex items-center text-[#D3D6DE] group-hover:text-primary-400 shrink-0 transition-colors">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
@@ -293,11 +289,11 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTa
 
       {/* 학년 필터 */}
       <div className="mb-4">
-        <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-2.5">학년</p>
+        <p className="text-[10px] font-bold text-primary-500 uppercase tracking-widest mb-2.5">학년</p>
         <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
           <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input type="checkbox" checked={selectedGrades.length === 0} onChange={() => onGradeChange([])} className="w-4 h-4 accent-indigo-600" />
-            <span className="text-sm text-gray-600">전체</span>
+            <input type="checkbox" checked={selectedGrades.length === 0} onChange={() => onGradeChange([])} className="w-4 h-4 accent-primary-500" />
+            <span className="text-sm text-[#383642]">전체</span>
           </label>
           {ALL_GRADES.map((grade) => (
             <label key={grade} className="flex items-center gap-2 cursor-pointer select-none">
@@ -310,9 +306,9 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTa
                     return next.length === ALL_GRADES.length ? [] : next;
                   })
                 }
-                className="w-4 h-4 accent-indigo-600"
+                className="w-4 h-4 accent-primary-500"
               />
-              <span className="text-sm text-gray-600">{grade}</span>
+              <span className="text-sm text-[#383642]">{grade}</span>
             </label>
           ))}
         </div>
@@ -320,12 +316,14 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTa
 
       <div className="h-px bg-gray-100 mb-4" />
 
-      {/* 태그 필터 */}
+      {/* 태그 필터 — 태그별 고유 색상 */}
       <div>
-        <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-2.5">태그</p>
+        <p className="text-[10px] font-bold text-primary-500 uppercase tracking-widest mb-2.5">태그</p>
         <div className="flex flex-wrap gap-2">
           {ALL_TAGS.map((tag) => {
             const isSelected = selectedTags.includes(tag);
+            const tagBg   = TAG_COLORS[tag] ?? '#ACB1BE';
+            const tagText = TAG_TEXT_COLORS[tag] ?? '#383642';
             return (
               <button
                 key={tag}
@@ -334,13 +332,13 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTa
                     prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
                   )
                 }
-                className={`px-3 py-1 text-xs font-semibold rounded-full border transition-all active:scale-95 ${
-                  isSelected
-                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
-                    : 'bg-white text-gray-600 border-gray-300 hover:border-indigo-400 hover:text-indigo-600'
-                }`}
+                className="px-3 py-1 text-xs font-semibold rounded-full border transition-all active:scale-95"
+                style={isSelected
+                  ? { backgroundColor: tagBg, color: tagText, borderColor: tagBg }
+                  : { backgroundColor: 'white', color: '#ACB1BE', borderColor: '#D3D6DE' }
+                }
               >
-                {tag}
+                #{tag}
               </button>
             );
           })}
@@ -350,7 +348,10 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTa
       {(selectedGrades.length > 0 || selectedTags.length > 0) && (
         <button
           onClick={() => { onGradeChange([]); onTagChange([]); }}
-          className="mt-4 w-full text-xs text-indigo-600 hover:text-indigo-800 font-semibold py-2 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-all"
+          className="mt-4 w-full text-xs font-semibold py-2 border rounded-lg transition-all"
+          style={{ color: '#4f7cff', borderColor: '#b8d0ff' }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f0f4ff'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
         >
           필터 초기화
         </button>
@@ -372,7 +373,8 @@ export default function Home() {
   const [selectedTags, setSelectedTags]     = useState([]);
 
   // ── 새로운 상태: 이벤트(반응/댓글 포함), 패널 뷰 ─────────────
-  const [events, setEvents]               = useState(EVENTS_DATA);
+  const [eventsBase, setEventsBase]       = useState(EVENTS_DATA);
+  const events = useMemo(() => eventsBase.map(applyTagColors), [eventsBase]);
   const [panelView, setPanelView]         = useState('list'); // 'list' | 'detail'
   const [detailEventId, setDetailEventId] = useState(null);
 
@@ -424,7 +426,7 @@ export default function Home() {
 
   // ── 일정 좋아요/싫어요 ─────────────────────────────────────
   const handleEventReaction = (eventId, reaction) => {
-    setEvents((prev) =>
+    setEventsBase((prev) =>
       prev.map((ev) => {
         if (ev.id !== eventId) return ev;
         const ep = { ...ev.extendedProps };
@@ -444,7 +446,7 @@ export default function Home() {
 
   // ── 댓글 좋아요/싫어요 ─────────────────────────────────────
   const handleCommentReaction = (eventId, commentId, reaction) => {
-    setEvents((prev) =>
+    setEventsBase((prev) =>
       prev.map((ev) => {
         if (ev.id !== eventId) return ev;
         const comments = ev.extendedProps.comments.map((c) => {
@@ -475,7 +477,7 @@ export default function Home() {
       createdAt: formatNow(),
       likes: 0, dislikes: 0, userReaction: null,
     };
-    setEvents((prev) =>
+    setEventsBase((prev) =>
       prev.map((ev) =>
         ev.id !== eventId
           ? ev
@@ -493,15 +495,15 @@ export default function Home() {
 
   // ─────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col h-screen bg-white overflow-hidden">
+    <div className="flex flex-col h-screen bg-surface overflow-hidden">
 
       {/* ━━━ Header ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      <header className="h-16 shrink-0 bg-white border-b border-gray-100 flex items-center justify-between px-6 z-10">
+      <header className="h-16 shrink-0 bg-white border-b border-[#D3D6DE] flex items-center justify-between px-6 z-10">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
+          <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center shadow-sm">
             <span className="text-white text-sm font-extrabold">C</span>
           </div>
-          <span className="text-xl font-extrabold text-gray-800 tracking-tight">COM:HUB</span>
+          <span className="text-xl font-extrabold text-[#383642] tracking-tight">COM:HUB</span>
         </div>
 
         <div className="flex items-center gap-3">
@@ -509,23 +511,23 @@ export default function Home() {
             <>
               <button
                 onClick={() => setIsAddModalOpen(true)}
-                className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 active:scale-95 transition-all shadow-sm"
+                className="flex items-center gap-1.5 px-4 py-2 bg-primary-500 text-white text-sm font-semibold rounded-lg hover:bg-primary-600 active:scale-95 transition-all shadow-sm"
               >
                 <span className="text-base leading-none">+</span>
                 <span>새 일정 등록</span>
               </button>
               <button
                 onClick={() => navigate('/profile')}
-                className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 rounded-full hover:bg-indigo-100 active:scale-95 transition-all"
+                className="flex items-center gap-2 px-3 py-1.5 bg-primary-50 rounded-full hover:bg-primary-100 active:scale-95 transition-all"
               >
-                <div className="w-6 h-6 bg-indigo-200 rounded-full flex items-center justify-center">
-                  <span className="text-xs font-bold text-indigo-700">{user.name.charAt(0)}</span>
+                <div className="w-6 h-6 bg-primary-200 rounded-full flex items-center justify-center">
+                  <span className="text-xs font-bold text-primary-700">{user.name.charAt(0)}</span>
                 </div>
-                <span className="text-sm font-semibold text-indigo-800">{user.name}님</span>
+                <span className="text-sm font-semibold text-primary-700">{user.name}님</span>
               </button>
               <button
                 onClick={handleLogout}
-                className="px-3 py-1.5 text-sm font-semibold text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 hover:text-gray-700 active:scale-95 transition-all"
+                className="px-3 py-1.5 text-sm font-semibold text-[#ACB1BE] border border-[#D3D6DE] rounded-lg hover:bg-[#E7EBF6] hover:text-[#383642] active:scale-95 transition-all"
               >
                 로그아웃
               </button>
@@ -533,7 +535,7 @@ export default function Home() {
           ) : (
             <button
               onClick={() => navigate('/login')}
-              className="px-5 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 active:scale-95 transition-all shadow-sm"
+              className="px-5 py-2 bg-primary-500 text-white text-sm font-semibold rounded-lg hover:bg-primary-600 active:scale-95 transition-all shadow-sm"
             >
               로그인
             </button>
@@ -581,27 +583,37 @@ export default function Home() {
               right:  'dayGridMonth,dayGridWeek filterBtn',
             }}
             buttonText={{ today: '오늘', month: '월별', week: '주별' }}
+            dayCellContent={(arg) => arg.date.getDate()}
+            eventContent={(arg) => {
+              const firstTag  = arg.event.extendedProps.tags?.[0];
+              const textColor = TAG_TEXT_COLORS[firstTag] ?? '#383642';
+              return (
+                <div style={{ color: textColor, fontWeight: 600, fontSize: '0.72rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '1px 4px' }}>
+                  {arg.event.title}
+                </div>
+              );
+            }}
           />
         </section>
 
         {/* ── 우측: Daily Agenda / 상세 패널 (30%) ───────────── */}
         {/* overflow-hidden + flex flex-col → 각 뷰가 내부 스크롤 관리 */}
         <aside
-          className="border-l border-gray-200 bg-gray-50 flex flex-col overflow-hidden"
+          className="border-l border-gray-100 bg-surface flex flex-col overflow-hidden"
           style={{ flex: '3 3 0' }}
         >
           {panelView === 'list' ? (
             /* ── 목록 뷰 ──────────────────────────────────────── */
             <div className="flex flex-col h-full overflow-hidden">
               {/* 날짜 헤더 (고정) */}
-              <div className="px-6 pt-6 pb-4 border-b border-gray-200 bg-gray-50 shrink-0">
-                <p className="text-xs font-bold text-indigo-500 uppercase tracking-widest mb-1">
+              <div className="px-6 pt-6 pb-4 border-b border-gray-100 bg-surface shrink-0">
+                <p className="text-xs font-bold text-primary-500 uppercase tracking-widest mb-1">
                   Daily Agenda
                 </p>
-                <h2 className="text-2xl font-extrabold text-gray-800 leading-tight">
+                <h2 className="text-2xl font-extrabold text-[#383642] leading-tight">
                   {formatDateLabel(selectedDate)}
                 </h2>
-                <p className="text-xs text-gray-400 mt-1.5">
+                <p className="text-xs text-[#ACB1BE] mt-1.5">
                   {agendaEvents.length > 0 ? `총 ${agendaEvents.length}개의 일정` : '일정 없음'}
                 </p>
               </div>
@@ -611,8 +623,8 @@ export default function Home() {
                 {agendaEvents.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full py-16 text-center select-none">
                     <div className="text-4xl mb-3">🗓️</div>
-                    <p className="text-sm font-semibold text-gray-500">예정된 일정이 없습니다.</p>
-                    <p className="text-xs text-gray-400 mt-1.5">달력에서 다른 날짜를 클릭해 보세요.</p>
+                    <p className="text-sm font-semibold text-[#ACB1BE]">예정된 일정이 없습니다.</p>
+                    <p className="text-xs text-[#ACB1BE] mt-1.5">달력에서 다른 날짜를 클릭해 보세요.</p>
                   </div>
                 ) : (
                   agendaEvents.map((ev, i) => (
