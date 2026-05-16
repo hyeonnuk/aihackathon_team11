@@ -113,9 +113,11 @@ function Field({ label, required, children }) {
 
 export default function EventAddModal({ isOpen, onClose, onCreated, initialData = null, mode = 'add' }) {
   const user = getStoredUser();
-  const canManageNotice = user?.role === 'master' || user?.role === 'admin';
+const authorName = user?.repBadge ? `${user.repBadge} ${user.name}` : (user?.name ?? 'unknown');
+const canManageNotice = user?.role === 'master' || user?.role === 'admin';
+
   const [form, setForm] = useState(() =>
-    mode === 'edit' && initialData ? initialData : initForm(user?.name),
+    mode === 'edit' && initialData ? initialData : initForm(authorName),
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -124,7 +126,7 @@ export default function EventAddModal({ isOpen, onClose, onCreated, initialData 
     if (mode === 'edit' && initialData) {
       setForm(initialData);
     } else {
-      setForm(initForm(getStoredUser()?.name));
+      setForm(initForm(authorName));
     }
     setIsSubmitting(false);
   }, [isOpen]);
@@ -136,7 +138,7 @@ export default function EventAddModal({ isOpen, onClose, onCreated, initialData 
   };
 
   const resetAndClose = () => {
-    setForm(initForm(user?.name));
+    setForm(initForm(authorName));
     setIsSubmitting(false);
     onClose();
   };

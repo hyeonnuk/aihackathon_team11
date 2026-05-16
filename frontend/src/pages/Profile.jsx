@@ -133,6 +133,7 @@ export default function Profile() {
   const [isPostsExpanded, setIsPostsExpanded] = useState(false);
   const [isCommentsExpanded, setIsCommentsExpanded] = useState(false);
   const [showBadgeInfo, setShowBadgeInfo] = useState(false);
+  const [isSelectingRepBadge, setIsSelectingRepBadge] = useState(false);
   const [myPosts, setMyPosts] = useState(() => getStoredUser()?.posts || []);
   const [myComments, setMyComments] = useState(() => getStoredUser()?.comments || []);
 
@@ -255,6 +256,27 @@ export default function Profile() {
     }
   };
 
+  const handleSetRepBadge = async (badgeStr) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/users/${user.id}/rep-badge`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repBadge: badgeStr }),
+      });
+      if (!response.ok) throw new Error('대표 뱃지 설정 실패');
+      
+      const updatedUser = { ...user, repBadge: badgeStr };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+      setIsSelectingRepBadge(false);
+    } catch (error) {
+      const updatedUser = { ...user, repBadge: badgeStr };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+      setIsSelectingRepBadge(false);
+    }
+  };
+
   if (!user) return null;
 
   return (
@@ -300,8 +322,18 @@ export default function Profile() {
             />
           </div>
 
+          <div className="flex items-center gap-2 mb-1.5 mt-2">
+            {user.repBadge && (
+              <span className="px-2 py-0.5 rounded-full bg-primary-50 text-primary-700 text-[10px] font-bold border border-primary-200 shadow-sm">
+                {user.repBadge}
+              </span>
+            )}
+            <button onClick={() => setIsSelectingRepBadge(true)} className="text-[10px] text-gray-400 hover:text-primary-500 underline underline-offset-2">
+              대표 뱃지 {user.repBadge ? '변경' : '설정'}
+            </button>
+          </div>
           <h1 className="flex items-baseline gap-2 text-xl font-extrabold text-gray-800">
-            {user.name}
+            {user.repBadge ? `${user.repBadge} ` : ''}{user.name}
             <span className="text-sm font-semibold text-gray-400">@{user.loginId || 'unknown'}</span>
           </h1>
           <p className="mt-1 text-xs text-gray-400">
@@ -463,6 +495,49 @@ export default function Profile() {
               >
                 확인
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 대표 뱃지 선택 모달 */}
+      {isSelectingRepBadge && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 animate-fade-in" onClick={() => setIsSelectingRepBadge(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h3 className="font-bold text-gray-800">대표 뱃지 설정</h3>
+              <button onClick={() => setIsSelectingRepBadge(false)} className="text-gray-400 hover:text-gray-600 text-2xl font-light leading-none px-2">&times;</button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-[60vh] flex flex-col gap-2 bg-slate-50">
+              <button
+                onClick={() => handleSetRepBadge(null)}
+                className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 font-semibold text-gray-600 transition-colors shadow-sm"
+              >
+                🚫 선택 해제 (칭호 없음)
+              </button>
+              {getEarnedBadges(user?.stats).length === 0 && (
+                <p className="text-sm text-gray-500 text-center py-6">획득한 뱃지가 없습니다.</p>
+              )}
+              {getEarnedBadges(user?.stats).map(badge => {
+                // '무한이' 단어 필터링
+                const badgePrefix = `${badge.icon} ${badge.label.replace('무한이', '').trim()}`;
+                return (
+                  <button
+                    key={badge.id}
+                    onClick={() => handleSetRepBadge(badgePrefix)}
+                    className="flex flex-col gap-1.5 w-full px-4 py-3 rounded-xl border border-gray-100 bg-white hover:border-primary-300 hover:bg-primary-50 transition-all text-left shadow-sm"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2.5 py-1 rounded-full border text-xs font-bold shadow-sm ${badge.style}`}>
+                        {badge.icon} {badge.label}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 font-medium pl-1">
+                      적용 예시: <span className="text-primary-600 font-bold">{badgePrefix} {user?.name}</span>
+                    </p>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

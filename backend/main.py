@@ -130,6 +130,10 @@ class LoginRequest(BaseModel):
         return value
 
 
+class RepBadgeUpdateRequest(BaseModel):
+    repBadge: str | None = None
+
+
 class ProfileImageUpdateRequest(BaseModel):
     profileImage: str = Field(min_length=1)
 
@@ -1176,6 +1180,39 @@ def update_profile_image(user_id: int, payload: ProfileImageUpdateRequest):
     return {
         "message": "Profile image updated.",
         "profileImage": payload.profileImage,
+    }
+
+
+@app.put("/api/users/{user_id}/rep-badge")
+def update_rep_badge(user_id: int, payload: RepBadgeUpdateRequest):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
+        try:
+            cursor.execute(
+                "UPDATE users SET rep_badge = %s WHERE id = %s",
+                (payload.repBadge, user_id),
+            )
+            connection.commit()
+            updated_count = cursor.rowcount
+        finally:
+            cursor.close()
+            connection.close()
+    except mysql.connector.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update rep badge.",
+        )
+
+    if updated_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found.",
+        )
+
+    return {
+        "message": "Representative badge updated.",
+        "repBadge": payload.repBadge,
     }
 
 
