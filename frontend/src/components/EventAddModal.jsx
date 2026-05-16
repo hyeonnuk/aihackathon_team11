@@ -47,6 +47,23 @@ function toHashtagText(hashtags) {
   return hashtags.length > 0 ? hashtags.map((tag) => `#${tag}`).join(' ') : null;
 }
 
+function fileToDataUrl(file) {
+  if (!file) return Promise.resolve(null);
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('이미지 파일을 읽지 못했습니다.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function normalizeLink(link) {
+  const trimmed = link.trim();
+  if (!trimmed) return null;
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
 function Field({ label, required, children }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -113,13 +130,21 @@ export default function EventAddModal({ isOpen, onClose, onCreated }) {
       return;
     }
 
+    let photoDataUrl = null;
+    try {
+      photoDataUrl = await fileToDataUrl(form.photo);
+    } catch (error) {
+      alert(error.message);
+      return;
+    }
+
     const payload = {
       title: form.title.trim(),
       startDate: toApiDateTime(form.startDate),
       endDate: toApiDateTime(endDate),
       content: form.content.trim(),
-      photo: form.photo?.name ?? null,
-      link: form.link.trim() || null,
+      photo: photoDataUrl,
+      link: normalizeLink(form.link),
       note: form.note.trim() || null,
       grade: form.grade,
       notice: form.notice,
@@ -238,7 +263,7 @@ export default function EventAddModal({ isOpen, onClose, onCreated }) {
               </Field>
               <Field label="링크">
                 <input
-                  type="url"
+                  type="text"
                   value={form.link}
                   onChange={set('link')}
                   placeholder="https://..."

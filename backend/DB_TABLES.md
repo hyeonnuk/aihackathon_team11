@@ -25,6 +25,7 @@ Stores registered user accounts.
 | `email` | `VARCHAR(255)` | Yes | Unique | `email` | Email address |
 | `login_id` | `VARCHAR(50)` | Yes | Unique | `loginId` | Login ID |
 | `password_hash` | `VARCHAR(255)` | Yes |  | Not returned | Bcrypt password hash |
+| `profile_image` | `LONGTEXT` | No |  | `profileImage` | Optional profile image data URL |
 | `created_at` | `TIMESTAMP` | Yes |  | `createdAt` | Created time |
 | `updated_at` | `TIMESTAMP` | Yes |  |  | Updated time |
 
@@ -45,14 +46,15 @@ Stores schedule posts.
 | `start_date` | `DATETIME` | Yes | Index | `startDate` | Start datetime |
 | `end_date` | `DATETIME` | Yes |  | `endDate` | End datetime |
 | `content` | `TEXT` | Yes |  | `content` | Schedule content |
-| `photo` | `VARCHAR(500)` | No |  | `photo` | Optional photo URL/path |
-| `link` | `VARCHAR(500)` | No |  | `link` | Optional link |
+| `photo` | `LONGTEXT` | No |  | `photo` | Optional photo data URL |
+| `link` | `VARCHAR(2048)` | No |  | `link` | Optional link |
 | `note` | `TEXT` | No |  | `note` | Optional note |
 | `grade` | `ENUM('1', '2', '3', '4', 'all')` | Yes | Index | `grade` | Target grade |
 | `notice` | `BOOLEAN` | Yes | Index | `notice` | Notice flag |
 | `hashtag` | `VARCHAR(255)` | No |  | `hashtag` | Optional hashtags |
 | `author` | `VARCHAR(50)` | Yes |  | `author` | Author name or ID |
 | `like_count` | `INT UNSIGNED` | Yes |  | `likeCount` | Like count, default `0` |
+| `dislike_count` | `INT UNSIGNED` | Yes |  | `dislikeCount` | Dislike count, default `0` |
 | `created_at` | `TIMESTAMP` | Yes |  | `createdAt` | Created time |
 | `updated_at` | `TIMESTAMP` | Yes |  | `updatedAt` | Updated time |
 

@@ -1,14 +1,8 @@
-// ============================================================
-//  pages/Profile.jsx — 경로: /profile
-//  내 프로필 페이지 (더미 UI)
-//  - localStorage에서 유저 정보 읽어 카드 형태로 표시
-//  - 비로그인 상태면 /login으로 리다이렉트
-// ============================================================
-
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-// localStorage 헬퍼
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+
 function getStoredUser() {
   try {
     const raw = localStorage.getItem('user');
@@ -17,22 +11,6 @@ function getStoredUser() {
     return null;
   }
 }
-
-// 더미 작성 글
-const MY_POSTS = [
-  { id: 1, title: '교내 웹 해커톤 프론트엔드 모집합니다!', date: '2026-05-01' },
-  { id: 2, title: '알고리즘 주말 스터디 하실 분?', date: '2026-04-20' },
-  { id: 5, title: '자바스크립트 딥다이브 스터디원 구함', date: '2026-04-15' },
-  { id: 6, title: '졸업작품 팀원 찾습니다 (백엔드 1명)', date: '2026-04-10' },
-];
-
-// 더미 작성 댓글
-const MY_COMMENTS = [
-  { id: 1, postId: 101, postTitle: '카카오 코딩테스트 준비 스터디', content: '저도 참여하고 싶습니다! DM 드릴게요.', date: '2026-05-10' },
-  { id: 2, postId: 102, postTitle: 'Google ML Bootcamp 팀원 모집', content: '혹시 데이터 분석 자리 남았을까요?', date: '2026-05-12' },
-  { id: 5, postId: 103, postTitle: '리액트 프로젝트 하실 분', content: '프론트엔드 지원합니다!', date: '2026-05-13' },
-  { id: 6, postId: 104, postTitle: '스프링 스터디 모집', content: '아직 모집 중이신가요?', date: '2026-05-14' },
-];
 
 // ── 뱃지 시스템 설정 ──────────────────────────────────────────
 // 뱃지 디자인 및 기본 정보
@@ -131,153 +109,210 @@ function getEarnedBadges(stats) {
   return earned;
 }
 
-// ── Profile: 프로필 페이지 컴포넌트 (export default) ─────────
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function Profile() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [profileImage, setProfileImage] = useState(null);
+  const fileInputRef = useRef(null);
+  const [user, setUser] = useState(() => getStoredUser());
+  const [profileImage, setProfileImage] = useState(() => getStoredUser()?.profileImage || null);
+  const [isUploading, setIsUploading] = useState(false);
   const [isPostsExpanded, setIsPostsExpanded] = useState(false);
   const [isCommentsExpanded, setIsCommentsExpanded] = useState(false);
   const [showBadgeInfo, setShowBadgeInfo] = useState(false);
-  const fileInputRef = useRef(null);
+  const [myPosts, setMyPosts] = useState(() => getStoredUser()?.posts || []);
+  const [myComments, setMyComments] = useState(() => getStoredUser()?.comments || []);
 
   useEffect(() => {
-    // 1. 임시 세션(localStorage)에서 로그인 유무 확인
-    const sessionUser = getStoredUser();
-    if (!sessionUser) {
+    if (!user) {
       navigate('/login');
       return;
     }
 
-    // 2. DB에서 유저 데이터(학번, 이름 등) 가져오기
-    const fetchUserFromDB = async () => {
+    const loadLatestUser = async () => {
       try {
-        // 💡 프론트엔드와 백엔드 주소가 다를 수 있으므로 절대 경로(예: 8080)를 명시해줍니다.
-        // 백엔드 포트가 다르다면 http://localhost:8080 부분을 수정해주세요.
-        const res = await fetch(`http://localhost:8080/api/users/${sessionUser.id}`);
+        const response = await fetch(`${API_BASE_URL}/api/users/${user.id}`);
         
-        if (res.ok) {
-          const dbData = await res.json();
-          console.log('✅ DB에서 받아온 유저 데이터:', dbData); // 개발자 도구(F12) 콘솔에서 실제 데이터 확인
-          alert(`DB에서 가져온 유저 데이터:\n${JSON.stringify(dbData, null, 2)}`); // 팝업으로 데이터 확인
-          
-          // 뱃지를 확인해 볼 수 있도록 더미 통계(stats) 값을 임시로 셋팅합니다. 
-          // (나중에 DB에서 활동 내역을 보내준다면 dbData.stats 로 바로 교체됩니다)
-          const mockStats = {
-            scheduleCount: 12,       // 1이상, 10이상 -> 아기 무한이, 어른 무한이
-            hasJoinedHackathon: true,// 참여 -> 해커톤 참여자
-            commentCount: 6,         // 3이상, 5이상 -> 직진중, 과속 무한이
-            isFirstCommenter: true,  // 1등 -> 확성기 무한이
-            likesCount: 15,          // 1, 5, 10 -> 해피, 행복한, 도파민 무한이
-            receivedLikesCount: 25,  // 1, 5, 20 -> 똑똑한, 유능한, 학사 무한이
-            dislikesCount: 8         // 5이상 -> 싫어하는 무한이
-          };
-          
-          // DB 데이터에 학번이 누락되어 있을 경우를 대비해, localStorage 데이터(sessionUser)와 병합합니다.
-          setUser({ ...sessionUser, ...dbData, stats: dbData.stats || mockStats });
-        } else {
-          console.error('서버에서 데이터를 불러오지 못했습니다. 상태 코드:', res.status);
-          setUser(sessionUser); // 실패 시 로컬 스토리지 데이터로 유지
+        if (!response.ok) {
+          throw new Error('데이터 불러오기 실패');
         }
-      } catch (error) {
-        console.error('DB에서 유저 정보를 가져오는데 실패했습니다:', error);
+
+        const data = await response.json();
+        const latestUser = data.user || data;
+
+        const localUser = getStoredUser() || {};
         
-        // 에러 시에도 뱃지 테스트 화면이 보이도록 임시 통계 추가
-        setUser({ ...sessionUser, stats: { 
-          scheduleCount: 1,         // 아기 무한이
-          hasJoinedHackathon: false, 
-          commentCount: 12,         // 폭주 무한이
-          isFirstCommenter: false, 
-          likesCount: 2,
-          receivedLikesCount: 0,
-          dislikesCount: 0
-        }}); 
-      } finally {
-        setIsLoading(false);
+        // --- 작성한 글/댓글 데이터 추출 (백엔드 API 분리 대비) ---
+        let fetchedPosts = latestUser.posts || latestUser.postList || [];
+        let fetchedComments = latestUser.comments || latestUser.commentList || [];
+
+        // 유저 정보에 글/댓글 배열이 없다면 개별 API 호출 시도
+        if (fetchedPosts.length === 0) {
+          try {
+            const postsRes = await fetch(`${API_BASE_URL}/api/users/${user.id}/posts`);
+            if (postsRes.ok) fetchedPosts = await postsRes.json();
+          } catch (e) { /* ignore */ }
+        }
+
+        if (fetchedComments.length === 0) {
+          try {
+            const commentsRes = await fetch(`${API_BASE_URL}/api/users/${user.id}/comments`);
+            if (commentsRes.ok) fetchedComments = await commentsRes.json();
+          } catch (e) { /* ignore */ }
+        }
+
+        // 🌟 백엔드 미구현/지연으로 인해 로컬에서 작성한 테스트 내용이 초기화되는 것을 방지 (병합 로직)
+        if (Array.isArray(localUser.posts) && localUser.posts.length > fetchedPosts.length) {
+          fetchedPosts = localUser.posts;
+        }
+        if (Array.isArray(localUser.comments) && localUser.comments.length > fetchedComments.length) {
+          fetchedComments = localUser.comments;
+        }
+
+        // 🌟 실제 DB 통계와 로컬 통계 중 더 높은 값 사용 (자동 뱃지 부여 보장)
+        const serverStats = latestUser.stats || {};
+        const localStatsObj = localUser.stats || {};
+        const realStats = {
+          scheduleCount: Math.max(serverStats.scheduleCount || 0, localStatsObj.scheduleCount || 0),
+          hasJoinedHackathon: serverStats.hasJoinedHackathon || localStatsObj.hasJoinedHackathon || false,
+          commentCount: Math.max(serverStats.commentCount || 0, localStatsObj.commentCount || 0, fetchedComments.length),
+          isFirstCommenter: serverStats.isFirstCommenter || localStatsObj.isFirstCommenter || false,
+          likesCount: Math.max(serverStats.likesCount || 0, localStatsObj.likesCount || 0),
+          receivedLikesCount: Math.max(serverStats.receivedLikesCount || 0, localStatsObj.receivedLikesCount || 0),
+          dislikesCount: Math.max(serverStats.dislikesCount || 0, localStatsObj.dislikesCount || 0)
+        };
+
+        const updatedUser = { ...localUser, ...latestUser, stats: realStats, posts: fetchedPosts, comments: fetchedComments };
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        setUser(updatedUser);
+        setProfileImage(updatedUser.profileImage || null);
+        setMyPosts(fetchedPosts);
+        setMyComments(fetchedComments);
+      } catch (error) {
+        // 네트워크 에러(백엔드 미연결) 시 로컬 스토리지 데이터를 최우선으로 사용하여 프로필에 반영
+        const localUser = getStoredUser() || user;
+        const localPosts = localUser?.posts || [];
+        const localComments = localUser?.comments || [];
+        const localStatsObj = localUser?.stats || {};
+        const localStats = {
+          scheduleCount: localStatsObj.scheduleCount || 0,
+          hasJoinedHackathon: localStatsObj.hasJoinedHackathon || false,
+          commentCount: Math.max(localStatsObj.commentCount || 0, localComments.length), // 작성한 댓글 개수를 세어 뱃지 부여
+          isFirstCommenter: localStatsObj.isFirstCommenter || false,
+          likesCount: localStatsObj.likesCount || 0,
+          receivedLikesCount: localStatsObj.receivedLikesCount || 0,
+          dislikesCount: localStatsObj.dislikesCount || 0
+        };
+
+        setUser(prev => ({ ...prev, ...localUser, stats: localStats }));
+        setMyPosts(localPosts);
+        setMyComments(localComments);
       }
     };
 
-    fetchUserFromDB();
-  }, [navigate]);
+    loadLatestUser();
+  }, [navigate, user?.id]);
 
-  // 이미지 업로드 핸들러
-  const handleImageChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setProfileImage(URL.createObjectURL(file));
-      // TODO: 백엔드로 이미지 파일(file) 전송 API 호출 추가 필요
+  const handleImageChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('이미지 파일만 선택할 수 있습니다.');
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      setProfileImage(dataUrl);
+
+      const response = await fetch(`${API_BASE_URL}/api/users/${user.id}/profile-image`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileImage: dataUrl }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.detail || data.message || '프로필 이미지 저장에 실패했습니다.');
+      }
+
+      const updatedUser = { ...user, profileImage: data.profileImage };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+      alert('프로필 이미지가 저장되었습니다.');
+    } catch (error) {
+      alert(`프로필 이미지 저장 실패\n${error.message}`);
+    } finally {
+      setIsUploading(false);
+      event.target.value = '';
     }
   };
 
-  if (isLoading) return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-      <div className="text-sm text-gray-400 font-medium">데이터를 불러오는 중...</div>
-    </div>
-  );
+  if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6">
-
-      {/* 뒤로 가기 */}
-      <div className="w-full max-w-lg mb-4">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-6">
+      <div className="mb-4 w-full max-w-lg">
         <button
           onClick={() => navigate('/')}
-          className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-indigo-600 transition-colors font-medium"
+          className="text-sm font-medium text-gray-400 transition-colors hover:text-indigo-600"
         >
-          ← 대시보드로 돌아가기
+          대시보드로 돌아가기
         </button>
       </div>
 
-      {/* 프로필 카드 */}
-      <div className="w-full max-w-lg bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-
-        {/* 상단 배너 */}
+      <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
         <div className="h-24 bg-gradient-to-r from-indigo-500 to-violet-500" />
 
-        {/* 아바타 + 기본 정보 */}
         <div className="px-6 pb-6">
-          {/* 아바타: 배너와 겹치도록 -mt 처리 */}
-          <div className="flex items-end justify-between -mt-10 mb-4">
-            <div 
+          <div className="-mt-10 mb-4 flex items-end justify-between">
+            <button
+              type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="w-20 h-20 rounded-2xl bg-indigo-600 border-4 border-white shadow-md flex items-center justify-center cursor-pointer overflow-hidden relative group"
+              disabled={isUploading}
+              className="group relative flex h-20 w-20 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-indigo-600 shadow-md disabled:cursor-wait"
             >
               {profileImage ? (
-                <img src={profileImage} alt="프로필" className="w-full h-full object-cover" />
+                <img src={profileImage} alt="프로필" className="h-full w-full object-cover" />
               ) : (
-                <span className="text-3xl font-extrabold text-white">
-                  {user.name.charAt(0)}
-                </span>
+                <span className="text-3xl font-extrabold text-white">{user.name?.charAt(0)}</span>
               )}
-              {/* 호버 시 사진 변경 안내 오버레이 */}
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-bold">
-                변경
-              </div>
-            </div>
-            <input 
-              type="file" 
-              accept="image/*" 
-              ref={fileInputRef} 
-              onChange={handleImageChange} 
-              className="hidden" 
+              <span className="absolute inset-0 flex items-center justify-center bg-black/40 text-xs font-bold text-white opacity-0 transition-opacity group-hover:opacity-100">
+                {isUploading ? '저장 중' : '변경'}
+              </span>
+            </button>
+            <input
+              type="file"
+              accept="image/*"
+              ref={fileInputRef}
+              onChange={handleImageChange}
+              className="hidden"
             />
           </div>
 
-          {/* 이름 / 역할 / 학번 */}
-          <h1 className="text-xl font-extrabold text-gray-800 flex items-baseline gap-2">
+          <h1 className="flex items-baseline gap-2 text-xl font-extrabold text-gray-800">
             {user.name}
-            <span className="text-sm font-semibold text-gray-400">@{user.loginId || user.login_id || '아이디 없음'}</span>
+            <span className="text-sm font-semibold text-gray-400">@{user.loginId || 'unknown'}</span>
           </h1>
-          <p className="text-sm text-indigo-600 font-semibold mt-0.5">{user.role}</p>
-          <p className="text-xs text-gray-400 mt-1">학번: {user.student_number || user.studentNumber || user.studentId || user.STUDENT_NUMBER || '학번 정보 없음'}</p>
+          <p className="mt-1 text-xs text-gray-400">
+            학번: {user.studentNumber || '학번 정보 없음'}
+          </p>
 
-          {/* 구분선 */}
-          <div className="h-px bg-gray-100 my-5" />
+          <div className="my-5 h-px bg-gray-100" />
 
           {/* 뱃지 */}
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">획득한 뱃지</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-500">획득한 뱃지</p>
             <button 
               onClick={() => setShowBadgeInfo(true)}
               className="flex items-center gap-1 px-2.5 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold hover:bg-indigo-100 active:scale-95 transition-all shadow-sm"
@@ -291,9 +326,9 @@ export default function Profile() {
             {getEarnedBadges(user.stats).map((badge) => (
               <div
                 key={badge.id}
-                className={`flex items-center gap-1.5 px-3 py-1.5 border shadow-sm rounded-full cursor-default hover:ring-4 transition-all duration-200 ${badge.style}`}
+                className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 shadow-sm transition-all duration-200 hover:ring-4 ${badge.style}`}
               >
-                <span className="text-sm">{badge.icon}</span>
+                <span className="text-xs font-extrabold">{badge.icon}</span>
                 <span className="text-xs font-extrabold">{badge.label}</span>
               </div>
             ))}
@@ -303,50 +338,64 @@ export default function Profile() {
             )}
           </div>
 
-          {/* 구분선 */}
-          <div className="h-px bg-gray-100 my-5" />
+          <div className="my-5 h-px bg-gray-100" />
 
           {/* 본인이 쓴 글 */}
-          <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-2">작성한 글</p>
-          <div className="flex flex-col gap-2 mb-5">
-            {(isPostsExpanded ? MY_POSTS : MY_POSTS.slice(0, 3)).map((post) => (
-              <div
-                key={post.id}
-                onClick={() => navigate(`/post/${post.id}`)}
-                className="p-3 bg-slate-50 border border-gray-100 rounded-xl hover:border-indigo-200 hover:bg-indigo-50/30 transition-all cursor-pointer"
-              >
-                <p className="text-sm font-semibold text-gray-700">{post.title}</p>
-                <p className="text-xs text-gray-400 mt-1">{post.date}</p>
-              </div>
-            ))}
-            {MY_POSTS.length > 3 && (
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-indigo-500">
+            작성한 글
+          </p>
+          <div className="mb-5 flex flex-col gap-2">
+            {myPosts.length > 0 ? (
+              (isPostsExpanded ? myPosts : myPosts.slice(0, 3)).map((post) => (
+                <button
+                  key={post.id}
+                  type="button"
+                  onClick={() => navigate(`/post/${post.id}`)}
+                  className="rounded-xl border border-gray-100 bg-slate-50 p-3 text-left transition-all hover:border-indigo-200 hover:bg-indigo-50/30"
+                >
+                  <p className="text-sm font-semibold text-gray-700">{post.title || post.subject || '제목 없음'}</p>
+                  <p className="mt-1 text-xs text-gray-400">{post.date || post.createdAt || post.created_at}</p>
+                </button>
+              ))
+            ) : (
+              <p className="px-1 text-xs font-medium text-gray-400">아직 작성한 글이 없습니다.</p>
+            )}
+            {myPosts.length > 3 && (
               <button
                 onClick={() => setIsPostsExpanded(!isPostsExpanded)}
-                className="text-xs font-semibold text-gray-500 hover:bg-gray-100 py-2 rounded-xl transition-colors mt-1"
+                className="mt-1 rounded-xl py-2 text-xs font-semibold text-gray-500 transition-colors hover:bg-gray-100"
               >
                 {isPostsExpanded ? '접기 ▲' : '펼쳐보기 ▼'}
               </button>
             )}
           </div>
 
-          {/* 본인이 쓴 댓글 */}
-          <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-2">작성한 댓글</p>
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-indigo-500">
+            작성한 댓글
+          </p>
           <div className="flex flex-col gap-2">
-            {(isCommentsExpanded ? MY_COMMENTS : MY_COMMENTS.slice(0, 3)).map((comment) => (
-              <div
-                key={comment.id}
-                onClick={() => navigate(`/post/${comment.postId}`)}
-                className="p-3 bg-slate-50 border border-gray-100 rounded-xl hover:border-indigo-200 hover:bg-indigo-50/30 transition-all cursor-pointer"
-              >
-                <p className="text-xs text-indigo-500 font-medium mb-1">원문: {comment.postTitle}</p>
-                <p className="text-sm text-gray-700">{comment.content}</p>
-                <p className="text-xs text-gray-400 mt-1">{comment.date}</p>
-              </div>
-            ))}
-            {MY_COMMENTS.length > 3 && (
+            {myComments.length > 0 ? (
+              (isCommentsExpanded ? myComments : myComments.slice(0, 3)).map((comment) => (
+                <button
+                  key={comment.id}
+                  type="button"
+                  onClick={() => navigate(`/post/${comment.postId || comment.post_id}`)}
+                  className="rounded-xl border border-gray-100 bg-slate-50 p-3 text-left transition-all hover:border-indigo-200 hover:bg-indigo-50/30"
+                >
+                  <p className="mb-1 text-xs font-medium text-indigo-500">
+                    원문: {comment.postTitle || comment.post_title || '게시글 확인하기'}
+                  </p>
+                  <p className="text-sm text-gray-700">{comment.content || comment.body || '내용 없음'}</p>
+                  <p className="mt-1 text-xs text-gray-400">{comment.date || comment.createdAt || comment.created_at}</p>
+                </button>
+              ))
+            ) : (
+              <p className="px-1 text-xs font-medium text-gray-400">아직 작성한 댓글이 없습니다.</p>
+            )}
+            {myComments.length > 3 && (
               <button
                 onClick={() => setIsCommentsExpanded(!isCommentsExpanded)}
-                className="text-xs font-semibold text-gray-500 hover:bg-gray-100 py-2 rounded-xl transition-colors mt-1"
+                className="mt-1 rounded-xl py-2 text-xs font-semibold text-gray-500 transition-colors hover:bg-gray-100"
               >
                 {isCommentsExpanded ? '접기 ▲' : '펼쳐보기 ▼'}
               </button>
