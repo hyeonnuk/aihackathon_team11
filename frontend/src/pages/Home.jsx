@@ -423,11 +423,13 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, showNoticeOnly, onG
         <p className="mb-2.5 text-[10px] font-bold uppercase tracking-widest text-primary-500">공지</p>
         <button
           onClick={() => onNoticeChange((prev) => !prev)}
-          className={`rounded-full border px-3 py-1 text-xs font-semibold transition-all active:scale-95 ${
-            showNoticeOnly
-              ? 'border-red-500 bg-red-500 text-white shadow-sm'
-              : 'border-gray-300 bg-white text-gray-600 hover:border-red-400 hover:text-red-500'
-          }`}
+          onMouseEnter={(e) => { if (!showNoticeOnly) { e.currentTarget.style.borderColor = '#f8927d'; e.currentTarget.style.color = '#f8927d'; } }}
+          onMouseLeave={(e) => { if (!showNoticeOnly) { e.currentTarget.style.borderColor = '#D3D6DE'; e.currentTarget.style.color = '#ACB1BE'; } }}
+          className="rounded-full border px-3 py-1 text-xs font-semibold transition-all active:scale-95"
+          style={showNoticeOnly
+            ? { backgroundColor: '#f8927d', borderColor: '#f8927d', color: 'white' }
+            : { backgroundColor: 'white', borderColor: '#D3D6DE', color: '#ACB1BE' }
+          }
         >
           공지만 보기
         </button>
