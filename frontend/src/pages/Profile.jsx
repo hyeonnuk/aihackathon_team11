@@ -1,14 +1,32 @@
-// ============================================================
-//  pages/Profile.jsx — 경로: /profile
-//  내 프로필 페이지 (더미 UI)
-//  - localStorage에서 유저 정보 읽어 카드 형태로 표시
-//  - 비로그인 상태면 /login으로 리다이렉트
-// ============================================================
-
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-// localStorage 헬퍼
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+
+const MY_POSTS = [
+  { id: 1, title: '교내 웹 해커톤 프론트엔드 모집합니다', date: '2026-05-01' },
+  { id: 2, title: '알고리즘 주말 스터디 하실 분', date: '2026-04-20' },
+];
+
+const MY_COMMENTS = [
+  {
+    id: 1,
+    postId: 101,
+    postTitle: '카카오 코딩테스트 준비 스터디',
+    content: '저도 참여하고 싶습니다.',
+    date: '2026-05-10',
+  },
+  {
+    id: 2,
+    postId: 102,
+    postTitle: 'Google ML Bootcamp 모집',
+    content: '데이터 분석 자리 가능할까요?',
+    date: '2026-05-12',
+  },
+];
+
+const BADGES = ['해커톤 참가', '알고리즘 스터디', 'ML Bootcamp'];
+
 function getStoredUser() {
   try {
     const raw = localStorage.getItem('user');
@@ -18,179 +36,177 @@ function getStoredUser() {
   }
 }
 
-// 더미 작성 글
-const MY_POSTS = [
-  { id: 1, title: '교내 웹 해커톤 프론트엔드 모집합니다!', date: '2026-05-01' },
-  { id: 2, title: '알고리즘 주말 스터디 하실 분?', date: '2026-04-20' },
-];
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
-// 더미 작성 댓글
-const MY_COMMENTS = [
-  { id: 1, postId: 101, postTitle: '카카오 코딩테스트 준비 스터디', content: '저도 참여하고 싶습니다! DM 드릴게요.', date: '2026-05-10' },
-  { id: 2, postId: 102, postTitle: 'Google ML Bootcamp 팀원 모집', content: '혹시 데이터 분석 자리 남았을까요?', date: '2026-05-12' },
-];
-
-// 더미 뱃지
-const BADGES = ['웹 해커톤 참가자', '알고리즘 스터디', 'ML 부트캠프'];
-
-// ── Profile: 프로필 페이지 컴포넌트 (export default) ─────────
 export default function Profile() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [profileImage, setProfileImage] = useState(null);
   const fileInputRef = useRef(null);
+  const [user, setUser] = useState(() => getStoredUser());
+  const [profileImage, setProfileImage] = useState(() => getStoredUser()?.profileImage || null);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
-    // 1. 임시 세션(localStorage)에서 로그인 유무 확인
-    const sessionUser = getStoredUser();
-    if (!sessionUser) {
+    if (!user) {
       navigate('/login');
       return;
     }
 
-    // 2. DB에서 유저 데이터(학번, 이름 등) 가져오기
-    const fetchUserFromDB = async () => {
+    const loadLatestUser = async () => {
       try {
-        // 💡 프론트엔드와 백엔드 주소가 다를 수 있으므로 절대 경로(예: 8080)를 명시해줍니다.
-        // 백엔드 포트가 다르다면 http://localhost:8080 부분을 수정해주세요.
-        const res = await fetch(`http://localhost:8080/api/users/${sessionUser.id}`);
-        
-        if (res.ok) {
-          const dbData = await res.json();
-          console.log('✅ DB에서 받아온 유저 데이터:', dbData); // 개발자 도구(F12) 콘솔에서 실제 데이터 확인
-          alert(`DB에서 가져온 유저 데이터:\n${JSON.stringify(dbData, null, 2)}`); // 팝업으로 데이터 확인
-          // DB 데이터에 학번이 누락되어 있을 경우를 대비해, localStorage 데이터(sessionUser)와 병합합니다.
-          setUser({ ...sessionUser, ...dbData });
-        } else {
-          console.error('서버에서 데이터를 불러오지 못했습니다. 상태 코드:', res.status);
-          setUser(sessionUser); // 실패 시 로컬 스토리지 데이터로 유지
-        }
-      } catch (error) {
-        console.error('DB에서 유저 정보를 가져오는데 실패했습니다:', error);
-        setUser(sessionUser); // 네트워크 에러 발생 시 임시 데이터 유지
-      } finally {
-        setIsLoading(false);
+        const response = await fetch(`${API_BASE_URL}/api/users/${user.id}`);
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const latestUser = data.user;
+        localStorage.setItem('user', JSON.stringify(latestUser));
+        setUser(latestUser);
+        setProfileImage(latestUser.profileImage || null);
+      } catch {
+        // Keep localStorage user when the network is unavailable.
       }
     };
 
-    fetchUserFromDB();
-  }, [navigate]);
+    loadLatestUser();
+  }, [navigate, user?.id]);
 
-  // 이미지 업로드 핸들러
-  const handleImageChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setProfileImage(URL.createObjectURL(file));
-      // TODO: 백엔드로 이미지 파일(file) 전송 API 호출 추가 필요
+  const handleImageChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('이미지 파일만 선택할 수 있습니다.');
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      setProfileImage(dataUrl);
+
+      const response = await fetch(`${API_BASE_URL}/api/users/${user.id}/profile-image`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileImage: dataUrl }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data.detail || data.message || '프로필 이미지 저장에 실패했습니다.');
+      }
+
+      const updatedUser = { ...user, profileImage: data.profileImage };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      setUser(updatedUser);
+      alert('프로필 이미지가 저장되었습니다.');
+    } catch (error) {
+      alert(`프로필 이미지 저장 실패\n${error.message}`);
+    } finally {
+      setIsUploading(false);
+      event.target.value = '';
     }
   };
 
-  if (isLoading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-500 font-semibold">데이터를 불러오는 중...</div>;
+  if (!user) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6">
-
-      {/* 뒤로 가기 */}
-      <div className="w-full max-w-lg mb-4">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-6">
+      <div className="mb-4 w-full max-w-lg">
         <button
           onClick={() => navigate('/')}
-          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-indigo-600 transition-colors"
+          className="text-sm text-gray-500 transition-colors hover:text-indigo-600"
         >
-          ← 대시보드로 돌아가기
+          대시보드로 돌아가기
         </button>
       </div>
 
-      {/* 프로필 카드 */}
-      <div className="w-full max-w-lg bg-white rounded-2xl shadow-md overflow-hidden">
-
-        {/* 상단 배너 */}
+      <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-md">
         <div className="h-24 bg-gradient-to-r from-indigo-500 to-blue-500" />
 
-        {/* 아바타 + 기본 정보 */}
         <div className="px-6 pb-6">
-          {/* 아바타: 배너와 겹치도록 -mt 처리 */}
-          <div className="flex items-end justify-between -mt-10 mb-4">
-            <div 
+          <div className="-mt-10 mb-4 flex items-end justify-between">
+            <button
+              type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="w-20 h-20 rounded-2xl bg-indigo-600 border-4 border-white shadow-md flex items-center justify-center cursor-pointer overflow-hidden relative group"
+              disabled={isUploading}
+              className="group relative flex h-20 w-20 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-indigo-600 shadow-md disabled:cursor-wait"
             >
               {profileImage ? (
-                <img src={profileImage} alt="프로필" className="w-full h-full object-cover" />
+                <img src={profileImage} alt="프로필" className="h-full w-full object-cover" />
               ) : (
-                <span className="text-3xl font-extrabold text-white">
-                  {user.name.charAt(0)}
-                </span>
+                <span className="text-3xl font-extrabold text-white">{user.name?.charAt(0)}</span>
               )}
-              {/* 호버 시 사진 변경 안내 오버레이 */}
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white text-xs font-bold">
-                변경
-              </div>
-            </div>
-            <input 
-              type="file" 
-              accept="image/*" 
-              ref={fileInputRef} 
-              onChange={handleImageChange} 
-              className="hidden" 
+              <span className="absolute inset-0 flex items-center justify-center bg-black/40 text-xs font-bold text-white opacity-0 transition-opacity group-hover:opacity-100">
+                {isUploading ? '저장 중' : '변경'}
+              </span>
+            </button>
+            <input
+              type="file"
+              accept="image/*"
+              ref={fileInputRef}
+              onChange={handleImageChange}
+              className="hidden"
             />
           </div>
 
-          {/* 이름 / 역할 / 학번 */}
-          <h1 className="text-xl font-extrabold text-gray-800 flex items-baseline gap-2">
+          <h1 className="flex items-baseline gap-2 text-xl font-extrabold text-gray-800">
             {user.name}
-            <span className="text-sm font-semibold text-gray-400">@{user.loginId || user.login_id || '아이디 없음'}</span>
+            <span className="text-sm font-semibold text-gray-400">@{user.loginId || 'unknown'}</span>
           </h1>
-          <p className="text-sm text-indigo-600 font-semibold mt-0.5">{user.role}</p>
-          <p className="text-xs text-gray-400 mt-1">학번: {user.student_number || user.studentNumber || user.studentId || user.STUDENT_NUMBER || '학번 정보 없음'}</p>
+          <p className="mt-1 text-xs text-gray-400">
+            학번: {user.studentNumber || '학번 정보 없음'}
+          </p>
+          <div className="my-5 h-px bg-gray-100" />
 
-          {/* 구분선 */}
-          <div className="h-px bg-gray-100 my-5" />
-
-          {/* 뱃지 */}
-          <h2 className="text-sm font-bold text-gray-700 mb-3">획득한 뱃지</h2>
+          <h2 className="mb-3 text-sm font-bold text-gray-700">획득한 배지</h2>
           <div className="flex flex-wrap gap-2">
             {BADGES.map((badge) => (
               <span
                 key={badge}
-                className="px-3 py-1 bg-gray-100 text-gray-600 text-xs font-semibold rounded-full"
+                className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600"
               >
                 {badge}
               </span>
             ))}
           </div>
 
-          {/* 구분선 */}
-          <div className="h-px bg-gray-100 my-5" />
+          <div className="my-5 h-px bg-gray-100" />
 
-          {/* 본인이 쓴 글 */}
-          <h2 className="text-sm font-bold text-gray-700 mb-3">본인이 쓴 글</h2>
-          <div className="flex flex-col gap-2 mb-5">
+          <h2 className="mb-3 text-sm font-bold text-gray-700">본인이 쓴 글</h2>
+          <div className="mb-5 flex flex-col gap-2">
             {MY_POSTS.map((post) => (
-              <div 
-                key={post.id} 
+              <button
+                key={post.id}
+                type="button"
                 onClick={() => navigate(`/post/${post.id}`)}
-                className="p-3 bg-gray-50 border border-gray-100 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer"
+                className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-left transition-colors hover:bg-gray-100"
               >
                 <p className="text-sm font-semibold text-gray-800">{post.title}</p>
-                <p className="text-xs text-gray-400 mt-1">{post.date}</p>
-              </div>
+                <p className="mt-1 text-xs text-gray-400">{post.date}</p>
+              </button>
             ))}
           </div>
 
-          {/* 본인이 쓴 댓글 */}
-          <h2 className="text-sm font-bold text-gray-700 mb-3">본인이 쓴 댓글</h2>
+          <h2 className="mb-3 text-sm font-bold text-gray-700">본인이 쓴 댓글</h2>
           <div className="flex flex-col gap-2">
             {MY_COMMENTS.map((comment) => (
-              <div 
-                key={comment.id} 
+              <button
+                key={comment.id}
+                type="button"
                 onClick={() => navigate(`/post/${comment.postId}`)}
-                className="p-3 bg-gray-50 border border-gray-100 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer"
+                className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-left transition-colors hover:bg-gray-100"
               >
-                <p className="text-xs text-indigo-600 font-medium mb-1">원문: {comment.postTitle}</p>
+                <p className="mb-1 text-xs font-medium text-indigo-600">원문: {comment.postTitle}</p>
                 <p className="text-sm text-gray-700">{comment.content}</p>
-                <p className="text-xs text-gray-400 mt-1">{comment.date}</p>
-              </div>
+                <p className="mt-1 text-xs text-gray-400">{comment.date}</p>
+              </button>
             ))}
           </div>
         </div>

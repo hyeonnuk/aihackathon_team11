@@ -97,6 +97,10 @@ class LoginRequest(BaseModel):
         return value
 
 
+class ProfileImageUpdateRequest(BaseModel):
+    profileImage: str = Field(min_length=1)
+
+
 class ScheduleCreateRequest(BaseModel):
     title: str = Field(min_length=1, max_length=100)
     startDate: datetime
@@ -259,6 +263,7 @@ def init_tables() -> None:
               email VARCHAR(255) NOT NULL,
               login_id VARCHAR(50) NOT NULL,
               password_hash VARCHAR(255) NOT NULL,
+              profile_image LONGTEXT NULL,
               created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
               updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
               PRIMARY KEY (id),
@@ -268,6 +273,9 @@ def init_tables() -> None:
             )
             """
         )
+        cursor.execute("SHOW COLUMNS FROM users LIKE 'profile_image'")
+        if cursor.fetchone() is None:
+            cursor.execute("ALTER TABLE users ADD COLUMN profile_image LONGTEXT NULL AFTER password_hash")
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS schedules (
@@ -325,6 +333,7 @@ def to_user_response(row: dict) -> dict:
         "phoneNumber": row["phone_number"],
         "email": row["email"],
         "loginId": row["login_id"],
+        "profileImage": row.get("profile_image"),
     }
 
 
@@ -441,7 +450,8 @@ def login(payload: LoginRequest):
         try:
             cursor.execute(
                 """
-                SELECT id, name, student_number, gender, phone_number, email, login_id, password_hash
+                SELECT id, name, student_number, gender, phone_number, email, login_id,
+                       password_hash, profile_image
                 FROM users
                 WHERE login_id = %s
                 LIMIT 1
@@ -507,6 +517,74 @@ def list_signup_users():
             }
             for user in users
         ],
+    }
+
+
+@app.get("/api/users/{user_id}")
+def get_user(user_id: int):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            cursor.execute(
+                """
+                SELECT id, name, student_number, gender, phone_number, email,
+                       login_id, profile_image
+                FROM users
+                WHERE id = %s
+                LIMIT 1
+                """,
+                (user_id,),
+            )
+            user = cursor.fetchone()
+        finally:
+            cursor.close()
+            connection.close()
+    except mysql.connector.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to load user.",
+        )
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found.",
+        )
+
+    return {"user": to_user_response(user)}
+
+
+@app.put("/api/users/{user_id}/profile-image")
+def update_profile_image(user_id: int, payload: ProfileImageUpdateRequest):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor()
+        try:
+            cursor.execute(
+                "UPDATE users SET profile_image = %s WHERE id = %s",
+                (payload.profileImage, user_id),
+            )
+            connection.commit()
+            updated_count = cursor.rowcount
+        finally:
+            cursor.close()
+            connection.close()
+    except mysql.connector.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update profile image.",
+        )
+
+    if updated_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found.",
+        )
+
+    return {
+        "message": "Profile image updated.",
+        "profileImage": payload.profileImage,
     }
 
 

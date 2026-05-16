@@ -25,6 +25,7 @@ Stores registered user accounts.
 | `email` | `VARCHAR(255)` | Yes | Unique | `email` | Email address |
 | `login_id` | `VARCHAR(50)` | Yes | Unique | `loginId` | Login ID |
 | `password_hash` | `VARCHAR(255)` | Yes |  | Not returned | Bcrypt password hash |
+| `profile_image` | `LONGTEXT` | No |  | `profileImage` | Optional profile image data URL |
 | `created_at` | `TIMESTAMP` | Yes |  | `createdAt` | Created time |
 | `updated_at` | `TIMESTAMP` | Yes |  |  | Updated time |
 
