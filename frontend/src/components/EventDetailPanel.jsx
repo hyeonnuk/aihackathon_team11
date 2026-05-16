@@ -277,6 +277,12 @@ function CommentCard({
               placeholder="답글을 입력하세요..."
               value={replyContent}
               onChange={(e) => setReplyContent(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent?.isComposing) {
+                  e.preventDefault();
+                  handleReplySubmit();
+                }
+              }}
               rows={2}
             />
             <div className="flex justify-end gap-2">
