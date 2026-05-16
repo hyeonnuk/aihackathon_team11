@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../App.css';
 import EventAddModal from '../components/EventAddModal';
@@ -6,28 +6,16 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 
-function getTodayStr() {
-  const now = new Date();
-  return [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, '0'),
-    String(now.getDate()).padStart(2, '0'),
-  ].join('-');
-}
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
-function formatDateLabel(dateStr) {
-  const [year, month, day] = dateStr.split('-').map(Number);
-  const d = new Date(year, month - 1, day);
-  return `${month}월 ${day}일 (${DAY_NAMES[d.getDay()]})`;
-}
-
 const ALL_GRADES = ['1학년', '2학년', '3학년', '4학년'];
-const ALL_TAGS   = ['공모전', '해커톤', '스터디', '프로젝트', '장학/취업'];
+const ALL_TAGS = ['공모전', '해커톤', '스터디', '프로젝트', '장학/취업'];
+const EVENT_COLORS = ['#818cf8', '#fb7185', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa', '#f472b6'];
 
-const EVENTS = [
+const DETAIL_EVENTS = [
   {
-    id: '1',
+    id: 'detail-1',
     title: '교내 웹 해커톤',
     start: '2026-05-20',
     end: '2026-05-23',
@@ -40,7 +28,7 @@ const EVENTS = [
     },
   },
   {
-    id: '2',
+    id: 'detail-2',
     title: '기말 프로젝트 발표',
     start: '2026-05-25',
     end: '2026-05-27',
@@ -53,7 +41,7 @@ const EVENTS = [
     },
   },
   {
-    id: '3',
+    id: 'detail-3',
     title: '카카오 코딩테스트',
     start: '2026-05-28',
     backgroundColor: '#fbbf24',
@@ -65,7 +53,7 @@ const EVENTS = [
     },
   },
   {
-    id: '4',
+    id: 'detail-4',
     title: '알고리즘 스터디',
     start: '2026-06-03',
     backgroundColor: '#34d399',
@@ -77,7 +65,7 @@ const EVENTS = [
     },
   },
   {
-    id: '5',
+    id: 'detail-5',
     title: 'Google ML Bootcamp',
     start: '2026-06-05',
     end: '2026-06-08',
@@ -89,47 +77,21 @@ const EVENTS = [
       description: 'Google 머신러닝 부트캠프. 사전 과제 제출 후 참가 가능.',
     },
   },
-  {
-    id: '6',
-    title: '장학금 신청 마감',
-    start: '2026-05-31',
-    backgroundColor: '#a78bfa',
-    borderColor: '#a78bfa',
-    extendedProps: {
-      grade: ['1학년', '2학년', '3학년', '4학년'],
-      tags: ['장학/취업'],
-      description: '2026년 1학기 성적 장학금 신청 마감일. 포털에서 신청 가능.',
-    },
-  },
-  {
-    id: '7',
-    title: '앱 공모전 접수 마감',
-    start: '2026-06-10',
-    backgroundColor: '#f472b6',
-    borderColor: '#f472b6',
-    extendedProps: {
-      grade: ['1학년', '2학년', '3학년'],
-      tags: ['공모전'],
-      description: '전국 대학생 앱 개발 공모전 접수 마감. 개인/팀 모두 가능.',
-    },
-  },
 ];
 
-function getFilteredEvents(selectedGrades, selectedTags) {
-  if (selectedGrades.length === 0 && selectedTags.length === 0) return EVENTS;
-  return EVENTS.filter(({ extendedProps: { grade, tags } }) => {
-    const gradeOk = selectedGrades.length === 0 || selectedGrades.some((g) => grade.includes(g));
-    const tagOk   = selectedTags.length === 0   || selectedTags.some((t) => tags.includes(t));
-    return gradeOk && tagOk;
-  });
+function getTodayStr() {
+  const now = new Date();
+  return [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0'),
+  ].join('-');
 }
 
-function getEventsForDate(events, dateStr) {
-  return events.filter((ev) =>
-    ev.end
-      ? dateStr >= ev.start && dateStr < ev.end
-      : dateStr === ev.start
-  );
+function formatDateLabel(dateStr) {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const d = new Date(year, month - 1, day);
+  return `${month}월 ${day}일 (${DAY_NAMES[d.getDay()]})`;
 }
 
 function getStoredUser() {
@@ -141,9 +103,81 @@ function getStoredUser() {
   }
 }
 
-// ── AgendaCard ──────────────────────────────────────────────
+function normalizeDateTime(value) {
+  return value ? value.replace(' ', 'T') : value;
+}
+
+function addOneDay(dateStr) {
+  const date = new Date(`${dateStr}T00:00:00`);
+  date.setDate(date.getDate() + 1);
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+function getDatePart(value) {
+  return normalizeDateTime(value)?.slice(0, 10);
+}
+
+function parseTags(hashtag) {
+  if (!hashtag) return [];
+  return hashtag
+    .split(/[\s,]+/)
+    .map((tag) => tag.trim().replace(/^#/, ''))
+    .filter(Boolean);
+}
+
+function gradeToLabels(grade) {
+  if (grade === 'all') return ALL_GRADES;
+  return [`${grade}학년`];
+}
+
+function scheduleToEvent(schedule, index) {
+  const color = schedule.notice ? '#ef4444' : EVENT_COLORS[index % EVENT_COLORS.length];
+
+  return {
+    id: String(schedule.id),
+    title: schedule.notice ? `[공지] ${schedule.title}` : schedule.title,
+    start: getDatePart(schedule.startDate),
+    end: addOneDay(getDatePart(schedule.endDate || schedule.startDate)),
+    allDay: true,
+    backgroundColor: color,
+    borderColor: color,
+    extendedProps: {
+      schedule,
+      grade: gradeToLabels(schedule.grade),
+      tags: parseTags(schedule.hashtag),
+      description: schedule.content,
+    },
+  };
+}
+
+function getFilteredEvents(events, selectedGrades, selectedTags) {
+  if (selectedGrades.length === 0 && selectedTags.length === 0) return events;
+
+  return events.filter(({ extendedProps: { grade, tags } }) => {
+    const gradeOk = selectedGrades.length === 0 || selectedGrades.some((g) => grade.includes(g));
+    const tagOk = selectedTags.length === 0 || selectedTags.some((t) => tags.includes(t));
+    return gradeOk && tagOk;
+  });
+}
+
+function getEventsForDate(events, dateStr) {
+  return events.filter((ev) => {
+    const start = getDatePart(ev.start);
+    const end = getDatePart(ev.end);
+
+    if (!start) return false;
+    if (!end || start === end) return start === dateStr;
+    return dateStr >= start && dateStr < end;
+  });
+}
+
 function AgendaCard({ event, isLast }) {
   const { description, tags } = event.extendedProps;
+
   return (
     <div>
       <div className="py-4 flex gap-3 items-stretch">
@@ -169,7 +203,6 @@ function AgendaCard({ event, isLast }) {
   );
 }
 
-// ── CalendarFilterPopup ─────────────────────────────────────
 function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTagChange, onClose }) {
   return (
     <div
@@ -181,7 +214,9 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTa
         <button
           onClick={onClose}
           className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors text-lg leading-none"
-        >×</button>
+        >
+          x
+        </button>
       </div>
       <p className="text-xs text-gray-400 mb-4">표시할 캘린더를 선택하세요.</p>
 
@@ -189,7 +224,12 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTa
         <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-2.5">학년</p>
         <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
           <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input type="checkbox" checked={selectedGrades.length === 0} onChange={() => onGradeChange([])} className="w-4 h-4 accent-indigo-600" />
+            <input
+              type="checkbox"
+              checked={selectedGrades.length === 0}
+              onChange={() => onGradeChange([])}
+              className="w-4 h-4 accent-indigo-600"
+            />
             <span className="text-sm text-gray-600">전체</span>
           </label>
           {ALL_GRADES.map((grade) => (
@@ -199,7 +239,9 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTa
                 checked={selectedGrades.includes(grade)}
                 onChange={() =>
                   onGradeChange((prev) => {
-                    const next = prev.includes(grade) ? prev.filter((g) => g !== grade) : [...prev, grade];
+                    const next = prev.includes(grade)
+                      ? prev.filter((g) => g !== grade)
+                      : [...prev, grade];
                     return next.length === ALL_GRADES.length ? [] : next;
                   })
                 }
@@ -241,7 +283,10 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTa
 
       {(selectedGrades.length > 0 || selectedTags.length > 0) && (
         <button
-          onClick={() => { onGradeChange([]); onTagChange([]); }}
+          onClick={() => {
+            onGradeChange([]);
+            onTagChange([]);
+          }}
           className="mt-4 w-full text-xs text-indigo-600 hover:text-indigo-800 font-semibold py-2 border border-indigo-200 rounded-xl hover:bg-indigo-50 transition-all"
         >
           필터 초기화
@@ -251,24 +296,48 @@ function CalendarFilterPopup({ selectedGrades, selectedTags, onGradeChange, onTa
   );
 }
 
-// ── Home ────────────────────────────────────────────────────
 export default function Home() {
   const navigate = useNavigate();
 
-  const [user, setUser]                     = useState(getStoredUser);
-  const [selectedDate, setSelectedDate]     = useState(getTodayStr);
+  const [user, setUser] = useState(getStoredUser);
+  const [selectedDate, setSelectedDate] = useState(getTodayStr);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isFilterOpen, setIsFilterOpen]     = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedGrades, setSelectedGrades] = useState([]);
-  const [selectedTags, setSelectedTags]     = useState([]);
+  const [selectedTags, setSelectedTags] = useState([]);
+  const [schedules, setSchedules] = useState([]);
+  const [scheduleError, setScheduleError] = useState('');
 
   const hasActiveFilters = selectedGrades.length > 0 || selectedTags.length > 0;
 
+  const loadSchedules = async () => {
+    setScheduleError('');
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/schedules`);
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.detail || data.message || '일정을 불러오지 못했습니다.');
+      }
+
+      setSchedules(data.schedules || []);
+    } catch (error) {
+      setScheduleError(error.message);
+      setSchedules([]);
+    }
+  };
+
+  useEffect(() => {
+    loadSchedules();
+  }, []);
+
   useEffect(() => {
     if (!isFilterOpen) return;
+
     const handler = (e) => {
       const popup = document.querySelector('.calendar-filter-popup');
-      const btn   = document.querySelector('.fc-filterBtn-button');
+      const btn = document.querySelector('.fc-filterBtn-button');
       if (popup && !popup.contains(e.target) && (!btn || !btn.contains(e.target))) {
         setIsFilterOpen(false);
       }
@@ -277,6 +346,23 @@ export default function Home() {
     return () => document.removeEventListener('mousedown', handler);
   }, [isFilterOpen]);
 
+  const events = useMemo(
+    () => schedules.map((schedule, index) => scheduleToEvent(schedule, index)),
+    [schedules],
+  );
+  const filteredEvents = useMemo(
+    () => getFilteredEvents(events, selectedGrades, selectedTags),
+    [events, selectedGrades, selectedTags],
+  );
+  const detailEvents = useMemo(
+    () => getFilteredEvents(DETAIL_EVENTS, selectedGrades, selectedTags),
+    [selectedGrades, selectedTags],
+  );
+  const agendaEvents = useMemo(
+    () => getEventsForDate(detailEvents, selectedDate),
+    [detailEvents, selectedDate],
+  );
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -284,22 +370,13 @@ export default function Home() {
     navigate('/login');
   };
 
-  const handleDateClick  = ({ dateStr }) => setSelectedDate(dateStr);
+  const handleDateClick = ({ dateStr }) => setSelectedDate(dateStr);
   const handleEventClick = ({ event }) => setSelectedDate(event.startStr.slice(0, 10));
-
-  const filteredEvents = getFilteredEvents(selectedGrades, selectedTags);
-  const agendaEvents   = getEventsForDate(filteredEvents, selectedDate);
 
   return (
     <div className="flex flex-col h-screen bg-slate-50 overflow-hidden">
-
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          Header
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <header className="shrink-0 bg-white border-b border-gray-100 px-6 z-10">
-        {/* 상단 행: 로고 + 인증 영역 */}
         <div className="h-14 flex items-center justify-between">
-          {/* 로고 */}
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 bg-indigo-600 rounded-xl flex items-center justify-center shadow-sm">
               <span className="text-white text-sm font-extrabold">C</span>
@@ -311,7 +388,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* 우측 인증 영역 */}
           <div className="flex items-center gap-2.5">
             {user ? (
               <>
@@ -327,8 +403,12 @@ export default function Home() {
                   onClick={() => navigate('/profile')}
                   className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 rounded-full hover:bg-indigo-100 active:scale-95 transition-all"
                 >
-                  <div className="w-6 h-6 bg-indigo-200 rounded-full flex items-center justify-center">
-                    <span className="text-xs font-bold text-indigo-700">{user.name.charAt(0)}</span>
+                  <div className="w-6 h-6 bg-indigo-200 rounded-full flex items-center justify-center overflow-hidden">
+                    {user.profileImage ? (
+                      <img src={user.profileImage} alt="프로필" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-xs font-bold text-indigo-700">{user.name?.charAt(0)}</span>
+                    )}
                   </div>
                   <span className="text-sm font-semibold text-indigo-700">{user.name}님</span>
                 </button>
@@ -350,17 +430,13 @@ export default function Home() {
             )}
           </div>
         </div>
-
       </header>
 
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          메인 콘텐츠 — 좌(캘린더) / 우(Daily Agenda)
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       <div className="flex flex-1 overflow-hidden min-h-0 p-4 gap-4">
-
-        {/* 좌측: FullCalendar 영역 (70%) */}
         <section
-          className={`bg-white rounded-2xl shadow-sm border border-gray-100 overflow-y-auto p-5 relative ${hasActiveFilters ? 'calendar-has-filters' : ''}`}
+          className={`bg-white rounded-2xl shadow-sm border border-gray-100 overflow-y-auto p-5 relative ${
+            hasActiveFilters ? 'calendar-has-filters' : ''
+          }`}
           style={{ flex: '7 7 0' }}
         >
           {isFilterOpen && (
@@ -371,6 +447,12 @@ export default function Home() {
               onTagChange={setSelectedTags}
               onClose={() => setIsFilterOpen(false)}
             />
+          )}
+
+          {scheduleError && (
+            <div className="mb-3 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+              {scheduleError}
+            </div>
           )}
 
           <FullCalendar
@@ -384,7 +466,7 @@ export default function Home() {
             height="auto"
             customButtons={{
               filterBtn: {
-                text: '📅',
+                text: '필터',
                 hint: '캘린더 필터',
                 click: () => setIsFilterOpen((prev) => !prev),
               },
@@ -398,7 +480,6 @@ export default function Home() {
           />
         </section>
 
-        {/* 우측: Daily Agenda 패널 (30%) */}
         <aside
           className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-y-auto flex flex-col"
           style={{ flex: '3 3 0' }}
@@ -418,7 +499,7 @@ export default function Home() {
           <div className="px-6 py-2 flex-1">
             {agendaEvents.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full py-16 text-center select-none">
-                <div className="text-4xl mb-3">🗓️</div>
+                <div className="text-4xl mb-3">-</div>
                 <p className="text-sm font-semibold text-gray-500">예정된 일정이 없습니다.</p>
                 <p className="text-xs text-gray-400 mt-1.5">달력에서 다른 날짜를 클릭해 보세요.</p>
               </div>
@@ -433,10 +514,13 @@ export default function Home() {
             )}
           </div>
         </aside>
-
       </div>
 
-      <EventAddModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
+      <EventAddModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onCreated={loadSchedules}
+      />
     </div>
   );
 }
