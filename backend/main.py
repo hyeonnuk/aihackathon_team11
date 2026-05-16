@@ -216,6 +216,7 @@ class ScheduleReactionRequest(BaseModel):
 class CommentCreateRequest(BaseModel):
     author: str = Field(min_length=1, max_length=50)
     content: str = Field(min_length=1)
+    parentId: int | None = None
 
     @field_validator("author", "content")
     @classmethod
@@ -412,6 +413,7 @@ def to_comment_response(row: dict) -> dict:
     return {
         "id": row["id"],
         "scheduleId": row["schedule_id"],
+        "parentId": row.get("parent_id"),
         "author": row["author"],
         "content": row["content"],
         "likes": row["like_count"],
@@ -427,18 +429,30 @@ def fetch_comments_by_schedule_ids(cursor, schedule_ids: list[int]) -> dict[int,
     placeholders = ", ".join(["%s"] * len(schedule_ids))
     cursor.execute(
         f"""
-        SELECT id, schedule_id, author, content, like_count, dislike_count, created_at
+        SELECT id, schedule_id, parent_id, author, content, like_count, dislike_count, created_at
         FROM schedule_comments
         WHERE schedule_id IN ({placeholders})
         ORDER BY created_at ASC, id ASC
         """,
         schedule_ids,
     )
+    all_comments = cursor.fetchall()
     comments_by_schedule_id = {schedule_id: [] for schedule_id in schedule_ids}
-    for comment in cursor.fetchall():
-        comments_by_schedule_id.setdefault(comment["schedule_id"], []).append(
-            to_comment_response(comment)
-        )
+    
+    # 1. 최상위 댓글 (parent_id가 없는 댓글) 그룹핑
+    for comment in all_comments:
+        if comment.get("parent_id") is None:
+            c_resp = to_comment_response(comment)
+            c_resp["replies"] = []
+            comments_by_schedule_id.setdefault(comment["schedule_id"], []).append(c_resp)
+            
+    # 2. 대댓글을 부모 댓글의 replies 배열에 담기
+    for comment in all_comments:
+        if comment.get("parent_id") is not None:
+            for parent_comment in comments_by_schedule_id.get(comment["schedule_id"], []):
+                if parent_comment["id"] == comment["parent_id"]:
+                    parent_comment.setdefault("replies", []).append(to_comment_response(comment))
+                    break
     return comments_by_schedule_id
 
 
@@ -638,7 +652,7 @@ def list_schedule_comments_for_test(schedule_id: int):
 
             cursor.execute(
                 """
-                SELECT id, schedule_id, author, content, like_count, dislike_count, created_at
+                SELECT id, schedule_id, parent_id, author, content, like_count, dislike_count, created_at
                 FROM schedule_comments
                 WHERE schedule_id = %s
                 ORDER BY created_at ASC, id ASC
@@ -866,4 +880,41 @@ def create_schedule_comment(schedule_id: int, payload: CommentCreateRequest):
         connection = get_connection()
         cursor = connection.cursor(dictionary=True)
         try:
-            cursor.execute("SELECT
+            cursor.execute("SELECT id FROM schedules WHERE id = %s LIMIT 1", (schedule_id,))
+            if cursor.fetchone() is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Schedule not found.",
+                )
+
+            cursor.execute(
+                """
+                INSERT INTO schedule_comments
+                  (schedule_id, parent_id, author, content)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (schedule_id, payload.parentId, payload.author, payload.content),
+            )
+            connection.commit()
+            comment_id = cursor.lastrowid
+
+            cursor.execute(
+                "SELECT id, schedule_id, parent_id, author, content, like_count, dislike_count, created_at FROM schedule_comments WHERE id = %s",
+                (comment_id,)
+            )
+            new_comment = cursor.fetchone()
+        finally:
+            cursor.close()
+            connection.close()
+    except HTTPException:
+        raise
+    except mysql.connector.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create comment.",
+        )
+
+    return {
+        "message": "Comment created.",
+        "comment": to_comment_response(new_comment)
+    }
