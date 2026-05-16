@@ -44,3 +44,19 @@ CREATE TABLE IF NOT EXISTS schedules (
   INDEX idx_schedules_grade (grade),
   INDEX idx_schedules_notice (notice)
 );
+
+CREATE TABLE IF NOT EXISTS schedule_comments (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  schedule_id BIGINT UNSIGNED NOT NULL,
+  author VARCHAR(50) NOT NULL,
+  content TEXT NOT NULL,
+  like_count INT UNSIGNED NOT NULL DEFAULT 0,
+  dislike_count INT UNSIGNED NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  INDEX idx_schedule_comments_schedule_id (schedule_id),
+  CONSTRAINT fk_schedule_comments_schedule_id
+    FOREIGN KEY (schedule_id) REFERENCES schedules(id)
+    ON DELETE CASCADE
+);

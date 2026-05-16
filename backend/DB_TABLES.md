@@ -64,6 +64,29 @@ Indexes:
 - `idx_schedules_grade`: `grade`
 - `idx_schedules_notice`: `notice`
 
+## schedule_comments
+
+Stores comments connected to schedules.
+
+| Column | Type | Required | Key | API Field | Description |
+| --- | --- | --- | --- | --- | --- |
+| `id` | `BIGINT UNSIGNED` | Yes | Primary Key | `id` | Auto-increment comment ID |
+| `schedule_id` | `BIGINT UNSIGNED` | Yes | Foreign Key, Index | `scheduleId` | Connected schedule ID |
+| `author` | `VARCHAR(50)` | Yes |  | `author` | Comment author |
+| `content` | `TEXT` | Yes |  | `content` | Comment content |
+| `like_count` | `INT UNSIGNED` | Yes |  | `likes` | Like count, default `0` |
+| `dislike_count` | `INT UNSIGNED` | Yes |  | `dislikes` | Dislike count, default `0` |
+| `created_at` | `TIMESTAMP` | Yes |  | `createdAt` | Created time |
+| `updated_at` | `TIMESTAMP` | Yes |  |  | Updated time |
+
+Foreign keys:
+
+- `fk_schedule_comments_schedule_id`: `schedule_id` references `schedules(id)` with `ON DELETE CASCADE`
+
+Indexes:
+
+- `idx_schedule_comments_schedule_id`: `schedule_id`
+
 ## Related Files
 
 - `main.py`: FastAPI app, table auto-creation, API logic

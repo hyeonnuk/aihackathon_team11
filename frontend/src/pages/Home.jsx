@@ -222,7 +222,15 @@ function scheduleToEvent(schedule, index) {
       likes: schedule.likeCount ?? 0,
       dislikes: schedule.dislikeCount ?? 0,
       userReaction: null,
-      comments: [],
+      comments: (schedule.comments || []).map((comment) => ({
+        id: comment.id,
+        author: comment.author,
+        content: comment.content,
+        createdAt: comment.createdAt,
+        likes: comment.likes ?? 0,
+        dislikes: comment.dislikes ?? 0,
+        userReaction: null,
+      })),
     },
   };
 }
@@ -255,6 +263,43 @@ function getDeadlineBadge(applyEndDate) {
   if (diff < 0) return 'closed';
   if (diff <= 3) return 'imminent';
   return null;
+}
+
+function buildEditInitialData(event) {
+  const ep = event.extendedProps;
+
+  let gradeValue = 'all';
+  if (ep.grade && ep.grade.length > 0 && ep.grade.length < ALL_GRADES.length) {
+    gradeValue = ep.grade[0].replace('학년', '');
+  }
+
+  let endDateStr = '';
+  if (event.end) {
+    const d = new Date(`${event.end}T00:00:00`);
+    d.setDate(d.getDate() - 1);
+    endDateStr = [
+      d.getFullYear(),
+      String(d.getMonth() + 1).padStart(2, '0'),
+      String(d.getDate()).padStart(2, '0'),
+    ].join('-');
+  }
+
+  const title = event.title.replace(/^\[공지\] /, '');
+
+  return {
+    scheduleId: ep.scheduleId,
+    title,
+    startDate: event.start ? `${event.start}T00:00` : '',
+    endDate: endDateStr ? `${endDateStr}T00:00` : '',
+    content: ep.description || '',
+    photo: ep.photo || null,
+    link: ep.applyLink || '',
+    note: ep.note || '',
+    grade: gradeValue,
+    notice: Boolean(ep.notice),
+    hashtags: ep.tags || [],
+    author: ep.author || '',
+  };
 }
 
 function getReactionUpdate(currentProps, reaction) {
@@ -453,6 +498,8 @@ export default function Home() {
   const [scheduleError, setScheduleError] = useState('');
   const [panelView, setPanelView] = useState('list');
   const [detailEventId, setDetailEventId] = useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editTargetEvent, setEditTargetEvent] = useState(null);
 
   const hasActiveFilters = selectedGrades.length > 0 || selectedTags.length > 0;
 
@@ -531,6 +578,40 @@ export default function Home() {
     setDetailEventId(null);
   };
 
+  const handleOpenEdit = (eventId) => {
+    const event = events.find((e) => e.id === eventId);
+    if (!event) return;
+    setEditTargetEvent(event);
+    setIsEditModalOpen(true);
+  };
+
+  const handleDeleteEvent = async (eventId) => {
+    const event = events.find((e) => e.id === eventId);
+    if (!event) return;
+    if (!window.confirm('이 일정을 삭제하시겠습니까?')) return;
+
+    const scheduleId = event.extendedProps.scheduleId;
+
+    setEvents((prev) => prev.filter((e) => e.id !== eventId));
+    handleBackToList();
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/schedules/${scheduleId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.detail || data.message || '삭제에 실패했습니다.');
+      }
+    } catch (error) {
+      setEvents((prev) => {
+        const stillAbsent = !prev.find((e) => e.id === eventId);
+        return stillAbsent ? [...prev, event] : prev;
+      });
+      alert(`일정 삭제 실패\n${error.message}`);
+    }
+  };
+
   const handleEventReaction = async (eventId, reaction) => {
     const currentEvent = events.find((event) => event.id === eventId);
     if (!currentEvent) return;
@@ -582,53 +663,95 @@ export default function Home() {
     }
   };
 
-  const handleCommentReaction = (eventId, commentId, reaction) => {
+  const handleCommentReaction = async (eventId, commentId, reaction) => {
+    const currentEvent = events.find((event) => event.id === eventId);
+    const currentComment = currentEvent?.extendedProps.comments.find(
+      (comment) => comment.id === commentId,
+    );
+    if (!currentEvent || !currentComment) return;
+
+    const { nextProps: nextComment, deltas } = getReactionUpdate(currentComment, reaction);
+
     setEvents((prev) =>
       prev.map((event) => {
         if (event.id !== eventId) return event;
-        const comments = event.extendedProps.comments.map((comment) => {
-          if (comment.id !== commentId) return comment;
-          const nextComment = { ...comment };
-          if (nextComment.userReaction === reaction) {
-            reaction === 'like' ? nextComment.likes-- : nextComment.dislikes--;
-            nextComment.userReaction = null;
-          } else {
-            if (nextComment.userReaction === 'like') nextComment.likes--;
-            if (nextComment.userReaction === 'dislike') nextComment.dislikes--;
-            reaction === 'like' ? nextComment.likes++ : nextComment.dislikes++;
-            nextComment.userReaction = reaction;
-          }
-          return nextComment;
-        });
+        const comments = event.extendedProps.comments.map((comment) =>
+          comment.id === commentId ? nextComment : comment,
+        );
         return { ...event, extendedProps: { ...event.extendedProps, comments } };
       }),
     );
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/schedules/${currentEvent.extendedProps.scheduleId}/comments/${commentId}/reactions`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(deltas),
+        },
+      );
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.detail || data.message || '댓글 반응을 저장하지 못했습니다.');
+      }
+
+      setEvents((prev) =>
+        prev.map((event) => {
+          if (event.id !== eventId) return event;
+          const comments = event.extendedProps.comments.map((comment) =>
+            comment.id === commentId
+              ? {
+                  ...comment,
+                  likes: data.likes ?? comment.likes,
+                  dislikes: data.dislikes ?? comment.dislikes,
+                }
+              : comment,
+          );
+          return { ...event, extendedProps: { ...event.extendedProps, comments } };
+        }),
+      );
+    } catch (error) {
+      setEvents((prev) =>
+        prev.map((event) => {
+          if (event.id !== eventId) return event;
+          const comments = event.extendedProps.comments.map((comment) =>
+            comment.id === commentId ? currentComment : comment,
+          );
+          return { ...event, extendedProps: { ...event.extendedProps, comments } };
+        }),
+      );
+      alert(error.message);
+    }
   };
 
-  const handleAddComment = (eventId, content) => {
-    const newComment = {
-      id: Date.now(),
-      author: user?.name ?? '익명',
-      content,
-      createdAt: formatNow(),
-      likes: 0,
-      dislikes: 0,
-      userReaction: null,
-    };
+  const handleAddComment = async (eventId, content) => {
+    const currentEvent = events.find((event) => event.id === eventId);
+    if (!currentEvent) return;
 
-    setEvents((prev) =>
-      prev.map((event) =>
-        event.id !== eventId
-          ? event
-          : {
-              ...event,
-              extendedProps: {
-                ...event.extendedProps,
-                comments: [...event.extendedProps.comments, newComment],
-              },
-            },
-      ),
-    );
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/schedules/${currentEvent.extendedProps.scheduleId}/comments`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            author: user?.name ?? 'unknown',
+            content,
+          }),
+        },
+      );
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.detail || data.message || '댓글을 저장하지 못했습니다.');
+      }
+
+      await loadSchedules();
+    } catch (error) {
+      alert(error.message);
+    }
   };
 
   return (
@@ -727,6 +850,16 @@ export default function Home() {
               right: 'dayGridMonth,dayGridWeek filterBtn',
             }}
             buttonText={{ today: '오늘', month: '월별', week: '주별' }}
+            dayCellContent={(arg) => arg.date.getDate()}
+            dayCellClassNames={(arg) => {
+              const d = arg.date;
+              const dateStr = [
+                d.getFullYear(),
+                String(d.getMonth() + 1).padStart(2, '0'),
+                String(d.getDate()).padStart(2, '0'),
+              ].join('-');
+              return dateStr === selectedDate ? ['day-selected'] : [];
+            }}
           />
         </section>
 
@@ -778,6 +911,8 @@ export default function Home() {
                 handleCommentReaction(detailEventId, commentId, reaction)
               }
               onAddComment={(content) => handleAddComment(detailEventId, content)}
+              onEdit={user ? () => handleOpenEdit(detailEventId) : undefined}
+              onDelete={user ? () => handleDeleteEvent(detailEventId) : undefined}
               user={user}
             />
           ) : null}
@@ -788,6 +923,15 @@ export default function Home() {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onCreated={loadSchedules}
+      />
+
+      <EventAddModal
+        key={editTargetEvent?.id ?? 'edit-modal'}
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onCreated={() => { loadSchedules(); setIsEditModalOpen(false); }}
+        mode="edit"
+        initialData={editTargetEvent ? buildEditInitialData(editTargetEvent) : null}
       />
     </div>
   );

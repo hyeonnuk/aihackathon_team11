@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -76,11 +76,24 @@ function Field({ label, required, children }) {
   );
 }
 
-export default function EventAddModal({ isOpen, onClose, onCreated }) {
+export default function EventAddModal({ isOpen, onClose, onCreated, initialData = null, mode = 'add' }) {
   const user = getStoredUser();
-  const [form, setForm] = useState(() => initForm(user?.name));
+  const [form, setForm] = useState(() =>
+    mode === 'edit' && initialData ? initialData : initForm(user?.name),
+  );
   const [tagInput, setTagInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (mode === 'edit' && initialData) {
+      setForm(initialData);
+    } else {
+      setForm(initForm(getStoredUser()?.name));
+    }
+    setTagInput('');
+    setIsSubmitting(false);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -132,7 +145,11 @@ export default function EventAddModal({ isOpen, onClose, onCreated }) {
 
     let photoDataUrl = null;
     try {
-      photoDataUrl = await fileToDataUrl(form.photo);
+      if (typeof form.photo === 'string') {
+        photoDataUrl = form.photo;
+      } else {
+        photoDataUrl = await fileToDataUrl(form.photo);
+      }
     } catch (error) {
       alert(error.message);
       return;
@@ -154,9 +171,14 @@ export default function EventAddModal({ isOpen, onClose, onCreated }) {
 
     setIsSubmitting(true);
 
+    const isEdit = mode === 'edit';
+    const url = isEdit
+      ? `${API_BASE_URL}/api/schedules/${initialData.scheduleId}`
+      : `${API_BASE_URL}/api/schedules`;
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/schedules`, {
-        method: 'POST',
+      const response = await fetch(url, {
+        method: isEdit ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
@@ -164,14 +186,14 @@ export default function EventAddModal({ isOpen, onClose, onCreated }) {
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(data.detail || data.message || '일정 등록에 실패했습니다.');
+        throw new Error(data.detail || data.message || (isEdit ? '일정 수정에 실패했습니다.' : '일정 등록에 실패했습니다.'));
       }
 
-      alert('일정이 등록되었습니다.');
+      alert(isEdit ? '일정이 수정되었습니다.' : '일정이 등록되었습니다.');
       onCreated?.(data);
       resetAndClose();
     } catch (error) {
-      alert(`일정 등록 실패\n${error.message}`);
+      alert(`${isEdit ? '일정 수정' : '일정 등록'} 실패\n${error.message}`);
       setIsSubmitting(false);
     }
   };
@@ -187,8 +209,12 @@ export default function EventAddModal({ isOpen, onClose, onCreated }) {
       >
         <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-6 py-4">
           <div>
-            <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-1">새 일정</p>
-            <h2 className="text-lg font-extrabold text-gray-800 leading-tight">새 일정 등록</h2>
+            <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-1">
+              {mode === 'edit' ? '일정 수정' : '새 일정'}
+            </p>
+            <h2 className="text-lg font-extrabold text-gray-800 leading-tight">
+              {mode === 'edit' ? '일정 수정' : '새 일정 등록'}
+            </h2>
             <p className="mt-0.5 text-xs text-gray-400">작성한 일정은 캘린더에 표시됩니다.</p>
           </div>
           <button
@@ -249,7 +275,9 @@ export default function EventAddModal({ isOpen, onClose, onCreated }) {
               <Field label="사진">
                 <label className="flex cursor-pointer select-none items-center gap-2 rounded-xl border border-dashed border-gray-300 px-4 py-3 text-sm transition-colors hover:border-indigo-400 hover:bg-indigo-50">
                   <span className="text-gray-500 truncate">
-                    {form.photo ? form.photo.name : '이미지 선택'}
+                    {form.photo
+                      ? typeof form.photo === 'string' ? '기존 이미지' : form.photo.name
+                      : '이미지 선택'}
                   </span>
                   <input
                     type="file"
@@ -384,7 +412,9 @@ export default function EventAddModal({ isOpen, onClose, onCreated }) {
             disabled={isSubmitting}
             className="rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-indigo-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-indigo-300"
           >
-            {isSubmitting ? '등록 중...' : '등록하기'}
+            {isSubmitting
+              ? (mode === 'edit' ? '수정 중...' : '등록 중...')
+              : (mode === 'edit' ? '수정하기' : '등록하기')}
           </button>
         </div>
       </div>
