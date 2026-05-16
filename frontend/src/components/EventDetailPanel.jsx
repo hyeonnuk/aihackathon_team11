@@ -192,6 +192,16 @@ export default function EventDetailPanel({
         </div>
 
         {/* 설명 */}
+        {ep.photo && (
+          <div className="overflow-hidden rounded-xl border border-gray-100 bg-white">
+            <img
+              src={ep.photo}
+              alt={event.title}
+              className="max-h-56 w-full object-cover"
+            />
+          </div>
+        )}
+
         <div className="bg-white rounded-xl p-4 border border-gray-100">
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">설명</p>
           <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap break-words">

@@ -106,8 +106,8 @@ class ScheduleCreateRequest(BaseModel):
     startDate: datetime
     endDate: datetime
     content: str = Field(min_length=1)
-    photo: str | None = Field(default=None, max_length=500)
-    link: str | None = Field(default=None, max_length=500)
+    photo: str | None = None
+    link: str | None = Field(default=None, max_length=2048)
     note: str | None = None
     grade: str = Field(min_length=1, max_length=10)
     notice: bool = False
@@ -162,8 +162,8 @@ class ScheduleUpdateRequest(BaseModel):
     startDate: datetime | None = None
     endDate: datetime | None = None
     content: str | None = Field(default=None, min_length=1)
-    photo: str | None = Field(default=None, max_length=500)
-    link: str | None = Field(default=None, max_length=500)
+    photo: str | None = None
+    link: str | None = Field(default=None, max_length=2048)
     note: str | None = None
     grade: str | None = Field(default=None, min_length=1, max_length=10)
     notice: bool | None = None
@@ -199,6 +199,17 @@ class ScheduleUpdateRequest(BaseModel):
     def validate_update_date_range(self):
         if self.startDate is not None and self.endDate is not None and self.endDate < self.startDate:
             raise ValueError("endDate must be greater than or equal to startDate")
+        return self
+
+
+class ScheduleReactionRequest(BaseModel):
+    likeDelta: int = Field(default=0, ge=-1, le=1)
+    dislikeDelta: int = Field(default=0, ge=-1, le=1)
+
+    @model_validator(mode="after")
+    def validate_reaction_delta(self):
+        if self.likeDelta == 0 and self.dislikeDelta == 0:
+            raise ValueError("likeDelta or dislikeDelta is required")
         return self
 
 
@@ -284,14 +295,15 @@ def init_tables() -> None:
               start_date DATETIME NOT NULL,
               end_date DATETIME NOT NULL,
               content TEXT NOT NULL,
-              photo VARCHAR(500) NULL,
-              link VARCHAR(500) NULL,
+              photo LONGTEXT NULL,
+              link VARCHAR(2048) NULL,
               note TEXT NULL,
               grade ENUM('1', '2', '3', '4', 'all') NOT NULL,
               notice BOOLEAN NOT NULL DEFAULT FALSE,
               hashtag VARCHAR(255) NULL,
               author VARCHAR(50) NOT NULL,
               like_count INT UNSIGNED NOT NULL DEFAULT 0,
+              dislike_count INT UNSIGNED NOT NULL DEFAULT 0,
               created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
               updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
               PRIMARY KEY (id),
@@ -301,6 +313,19 @@ def init_tables() -> None:
             )
             """
         )
+        cursor.execute("SHOW COLUMNS FROM schedules LIKE 'photo'")
+        photo_column = cursor.fetchone()
+        if photo_column and "longtext" not in str(photo_column[1]).lower():
+            cursor.execute("ALTER TABLE schedules MODIFY COLUMN photo LONGTEXT NULL")
+        cursor.execute("SHOW COLUMNS FROM schedules LIKE 'link'")
+        link_column = cursor.fetchone()
+        if link_column and "2048" not in str(link_column[1]):
+            cursor.execute("ALTER TABLE schedules MODIFY COLUMN link VARCHAR(2048) NULL")
+        cursor.execute("SHOW COLUMNS FROM schedules LIKE 'dislike_count'")
+        if cursor.fetchone() is None:
+            cursor.execute(
+                "ALTER TABLE schedules ADD COLUMN dislike_count INT UNSIGNED NOT NULL DEFAULT 0 AFTER like_count"
+            )
         connection.commit()
     finally:
         cursor.close()
@@ -356,6 +381,7 @@ def to_schedule_response(row: dict) -> dict:
         "hashtag": row["hashtag"],
         "author": row["author"],
         "likeCount": row["like_count"],
+        "dislikeCount": row["dislike_count"],
         "createdAt": serialize_datetime(row["created_at"]),
         "updatedAt": serialize_datetime(row["updated_at"]),
     }
@@ -597,7 +623,7 @@ def list_schedules():
             cursor.execute(
                 """
                 SELECT id, title, start_date, end_date, content, photo, link, note,
-                       grade, notice, hashtag, author, like_count, created_at, updated_at
+                       grade, notice, hashtag, author, like_count, dislike_count, created_at, updated_at
                 FROM schedules
                 ORDER BY start_date ASC, id ASC
                 """
@@ -627,7 +653,7 @@ def get_schedule(schedule_id: int):
             cursor.execute(
                 """
                 SELECT id, title, start_date, end_date, content, photo, link, note,
-                       grade, notice, hashtag, author, like_count, created_at, updated_at
+                       grade, notice, hashtag, author, like_count, dislike_count, created_at, updated_at
                 FROM schedules
                 WHERE id = %s
                 LIMIT 1
@@ -651,6 +677,58 @@ def get_schedule(schedule_id: int):
         )
 
     return {"schedule": to_schedule_response(schedule)}
+
+
+@app.patch("/api/schedules/{schedule_id}/reactions")
+def update_schedule_reactions(schedule_id: int, payload: ScheduleReactionRequest):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            cursor.execute(
+                """
+                UPDATE schedules
+                SET
+                  like_count = GREATEST(CAST(like_count AS SIGNED) + %s, 0),
+                  dislike_count = GREATEST(CAST(dislike_count AS SIGNED) + %s, 0)
+                WHERE id = %s
+                """,
+                (payload.likeDelta, payload.dislikeDelta, schedule_id),
+            )
+            if cursor.rowcount == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Schedule not found.",
+                )
+            connection.commit()
+
+            cursor.execute(
+                """
+                SELECT like_count, dislike_count
+                FROM schedules
+                WHERE id = %s
+                LIMIT 1
+                """,
+                (schedule_id,),
+            )
+            counts = cursor.fetchone()
+        finally:
+            cursor.close()
+            connection.close()
+    except HTTPException:
+        raise
+    except mysql.connector.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update schedule reactions.",
+        )
+
+    return {
+        "message": "Schedule reactions updated.",
+        "id": schedule_id,
+        "likeCount": counts["like_count"],
+        "dislikeCount": counts["dislike_count"],
+    }
 
 
 @app.post("/api/schedules", status_code=status.HTTP_201_CREATED)

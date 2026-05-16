@@ -220,7 +220,7 @@ function scheduleToEvent(schedule, index) {
       note: schedule.note || null,
       notice: Boolean(schedule.notice),
       likes: schedule.likeCount ?? 0,
-      dislikes: 0,
+      dislikes: schedule.dislikeCount ?? 0,
       userReaction: null,
       comments: [],
     },
@@ -255,6 +255,42 @@ function getDeadlineBadge(applyEndDate) {
   if (diff < 0) return 'closed';
   if (diff <= 3) return 'imminent';
   return null;
+}
+
+function getReactionUpdate(currentProps, reaction) {
+  const nextProps = { ...currentProps };
+  const deltas = { likeDelta: 0, dislikeDelta: 0 };
+
+  if (nextProps.userReaction === reaction) {
+    if (reaction === 'like') {
+      nextProps.likes = Math.max(nextProps.likes - 1, 0);
+      deltas.likeDelta = -1;
+    } else {
+      nextProps.dislikes = Math.max(nextProps.dislikes - 1, 0);
+      deltas.dislikeDelta = -1;
+    }
+    nextProps.userReaction = null;
+  } else {
+    if (nextProps.userReaction === 'like') {
+      nextProps.likes = Math.max(nextProps.likes - 1, 0);
+      deltas.likeDelta = -1;
+    }
+    if (nextProps.userReaction === 'dislike') {
+      nextProps.dislikes = Math.max(nextProps.dislikes - 1, 0);
+      deltas.dislikeDelta = -1;
+    }
+
+    if (reaction === 'like') {
+      nextProps.likes += 1;
+      deltas.likeDelta += 1;
+    } else {
+      nextProps.dislikes += 1;
+      deltas.dislikeDelta += 1;
+    }
+    nextProps.userReaction = reaction;
+  }
+
+  return { nextProps, deltas };
 }
 
 function AgendaCard({ event, isLast, onDetail }) {
@@ -495,23 +531,55 @@ export default function Home() {
     setDetailEventId(null);
   };
 
-  const handleEventReaction = (eventId, reaction) => {
+  const handleEventReaction = async (eventId, reaction) => {
+    const currentEvent = events.find((event) => event.id === eventId);
+    if (!currentEvent) return;
+
+    const { nextProps, deltas } = getReactionUpdate(currentEvent.extendedProps, reaction);
+
     setEvents((prev) =>
-      prev.map((event) => {
-        if (event.id !== eventId) return event;
-        const nextProps = { ...event.extendedProps };
-        if (nextProps.userReaction === reaction) {
-          reaction === 'like' ? nextProps.likes-- : nextProps.dislikes--;
-          nextProps.userReaction = null;
-        } else {
-          if (nextProps.userReaction === 'like') nextProps.likes--;
-          if (nextProps.userReaction === 'dislike') nextProps.dislikes--;
-          reaction === 'like' ? nextProps.likes++ : nextProps.dislikes++;
-          nextProps.userReaction = reaction;
-        }
-        return { ...event, extendedProps: nextProps };
-      }),
+      prev.map((event) =>
+        event.id === eventId ? { ...event, extendedProps: nextProps } : event,
+      ),
     );
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/schedules/${currentEvent.extendedProps.scheduleId}/reactions`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(deltas),
+        },
+      );
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.detail || data.message || '반응을 저장하지 못했습니다.');
+      }
+
+      setEvents((prev) =>
+        prev.map((event) =>
+          event.id === eventId
+            ? {
+                ...event,
+                extendedProps: {
+                  ...event.extendedProps,
+                  likes: data.likeCount ?? event.extendedProps.likes,
+                  dislikes: data.dislikeCount ?? event.extendedProps.dislikes,
+                },
+              }
+            : event,
+        ),
+      );
+    } catch (error) {
+      setEvents((prev) =>
+        prev.map((event) =>
+          event.id === eventId ? { ...event, extendedProps: currentEvent.extendedProps } : event,
+        ),
+      );
+      alert(error.message);
+    }
   };
 
   const handleCommentReaction = (eventId, commentId, reaction) => {
