@@ -194,7 +194,7 @@ function gradeToLabels(grade) {
   return [`${grade}학년`];
 }
 
-function scheduleToCalendarEvent(schedule, index) {
+function scheduleToEvent(schedule, index) {
   const color = schedule.notice ? '#ef4444' : EVENT_COLORS[index % EVENT_COLORS.length];
   const start = getDatePart(schedule.startDate);
   const end = getDatePart(schedule.endDate || schedule.startDate);
@@ -208,9 +208,21 @@ function scheduleToCalendarEvent(schedule, index) {
     backgroundColor: color,
     borderColor: color,
     extendedProps: {
+      scheduleId: schedule.id,
       grade: gradeToLabels(schedule.grade),
       tags: parseTags(schedule.hashtag),
-      description: schedule.content,
+      description: schedule.content || '',
+      applyPeriod: start && end ? `${start} ~ ${end}` : null,
+      applyEndDate: end || start,
+      author: schedule.author || '',
+      applyLink: schedule.link || null,
+      photo: schedule.photo || null,
+      note: schedule.note || null,
+      notice: Boolean(schedule.notice),
+      likes: schedule.likeCount ?? 0,
+      dislikes: 0,
+      userReaction: null,
+      comments: [],
     },
   };
 }
@@ -401,9 +413,8 @@ export default function Home() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedGrades, setSelectedGrades] = useState([]);
   const [selectedTags, setSelectedTags] = useState([]);
-  const [schedules, setSchedules] = useState([]);
+  const [events, setEvents] = useState([]);
   const [scheduleError, setScheduleError] = useState('');
-  const [detailEvents, setDetailEvents] = useState(EVENTS_DATA);
   const [panelView, setPanelView] = useState('list');
   const [detailEventId, setDetailEventId] = useState(null);
 
@@ -419,10 +430,10 @@ export default function Home() {
         throw new Error(data.detail || data.message || '일정을 불러오지 못했습니다.');
       }
 
-      setSchedules(data.schedules || []);
+      setEvents((data.schedules || []).map((schedule, index) => scheduleToEvent(schedule, index)));
     } catch (error) {
       setScheduleError(error.message);
-      setSchedules([]);
+      setEvents([]);
     }
   };
 
@@ -443,24 +454,16 @@ export default function Home() {
     return () => document.removeEventListener('mousedown', handler);
   }, [isFilterOpen]);
 
-  const calendarEvents = useMemo(
-    () => schedules.map((schedule, index) => scheduleToCalendarEvent(schedule, index)),
-    [schedules],
-  );
   const filteredCalendarEvents = useMemo(
-    () => getFilteredEvents(calendarEvents, selectedGrades, selectedTags),
-    [calendarEvents, selectedGrades, selectedTags],
-  );
-  const filteredDetailEvents = useMemo(
-    () => getFilteredEvents(detailEvents, selectedGrades, selectedTags),
-    [detailEvents, selectedGrades, selectedTags],
+    () => getFilteredEvents(events, selectedGrades, selectedTags),
+    [events, selectedGrades, selectedTags],
   );
   const agendaEvents = useMemo(
-    () => getEventsForDate(filteredDetailEvents, selectedDate),
-    [filteredDetailEvents, selectedDate],
+    () => getEventsForDate(filteredCalendarEvents, selectedDate),
+    [filteredCalendarEvents, selectedDate],
   );
   const detailEvent = detailEventId
-    ? detailEvents.find((event) => event.id === detailEventId) ?? null
+    ? events.find((event) => event.id === detailEventId) ?? null
     : null;
 
   const handleLogout = () => {
@@ -478,8 +481,8 @@ export default function Home() {
 
   const handleCalendarEventClick = ({ event }) => {
     setSelectedDate(event.startStr.slice(0, 10));
-    setPanelView('list');
-    setDetailEventId(null);
+    setDetailEventId(event.id);
+    setPanelView('detail');
   };
 
   const handleShowDetail = (eventId) => {
@@ -493,7 +496,7 @@ export default function Home() {
   };
 
   const handleEventReaction = (eventId, reaction) => {
-    setDetailEvents((prev) =>
+    setEvents((prev) =>
       prev.map((event) => {
         if (event.id !== eventId) return event;
         const nextProps = { ...event.extendedProps };
@@ -512,7 +515,7 @@ export default function Home() {
   };
 
   const handleCommentReaction = (eventId, commentId, reaction) => {
-    setDetailEvents((prev) =>
+    setEvents((prev) =>
       prev.map((event) => {
         if (event.id !== eventId) return event;
         const comments = event.extendedProps.comments.map((comment) => {
@@ -545,7 +548,7 @@ export default function Home() {
       userReaction: null,
     };
 
-    setDetailEvents((prev) =>
+    setEvents((prev) =>
       prev.map((event) =>
         event.id !== eventId
           ? event
