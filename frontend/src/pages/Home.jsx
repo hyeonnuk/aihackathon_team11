@@ -222,7 +222,15 @@ function scheduleToEvent(schedule, index) {
       likes: schedule.likeCount ?? 0,
       dislikes: schedule.dislikeCount ?? 0,
       userReaction: null,
-      comments: [],
+      comments: (schedule.comments || []).map((comment) => ({
+        id: comment.id,
+        author: comment.author,
+        content: comment.content,
+        createdAt: comment.createdAt,
+        likes: comment.likes ?? 0,
+        dislikes: comment.dislikes ?? 0,
+        userReaction: null,
+      })),
     },
   };
 }
@@ -582,53 +590,95 @@ export default function Home() {
     }
   };
 
-  const handleCommentReaction = (eventId, commentId, reaction) => {
+  const handleCommentReaction = async (eventId, commentId, reaction) => {
+    const currentEvent = events.find((event) => event.id === eventId);
+    const currentComment = currentEvent?.extendedProps.comments.find(
+      (comment) => comment.id === commentId,
+    );
+    if (!currentEvent || !currentComment) return;
+
+    const { nextProps: nextComment, deltas } = getReactionUpdate(currentComment, reaction);
+
     setEvents((prev) =>
       prev.map((event) => {
         if (event.id !== eventId) return event;
-        const comments = event.extendedProps.comments.map((comment) => {
-          if (comment.id !== commentId) return comment;
-          const nextComment = { ...comment };
-          if (nextComment.userReaction === reaction) {
-            reaction === 'like' ? nextComment.likes-- : nextComment.dislikes--;
-            nextComment.userReaction = null;
-          } else {
-            if (nextComment.userReaction === 'like') nextComment.likes--;
-            if (nextComment.userReaction === 'dislike') nextComment.dislikes--;
-            reaction === 'like' ? nextComment.likes++ : nextComment.dislikes++;
-            nextComment.userReaction = reaction;
-          }
-          return nextComment;
-        });
+        const comments = event.extendedProps.comments.map((comment) =>
+          comment.id === commentId ? nextComment : comment,
+        );
         return { ...event, extendedProps: { ...event.extendedProps, comments } };
       }),
     );
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/schedules/${currentEvent.extendedProps.scheduleId}/comments/${commentId}/reactions`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(deltas),
+        },
+      );
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.detail || data.message || '댓글 반응을 저장하지 못했습니다.');
+      }
+
+      setEvents((prev) =>
+        prev.map((event) => {
+          if (event.id !== eventId) return event;
+          const comments = event.extendedProps.comments.map((comment) =>
+            comment.id === commentId
+              ? {
+                  ...comment,
+                  likes: data.likes ?? comment.likes,
+                  dislikes: data.dislikes ?? comment.dislikes,
+                }
+              : comment,
+          );
+          return { ...event, extendedProps: { ...event.extendedProps, comments } };
+        }),
+      );
+    } catch (error) {
+      setEvents((prev) =>
+        prev.map((event) => {
+          if (event.id !== eventId) return event;
+          const comments = event.extendedProps.comments.map((comment) =>
+            comment.id === commentId ? currentComment : comment,
+          );
+          return { ...event, extendedProps: { ...event.extendedProps, comments } };
+        }),
+      );
+      alert(error.message);
+    }
   };
 
-  const handleAddComment = (eventId, content) => {
-    const newComment = {
-      id: Date.now(),
-      author: user?.name ?? '익명',
-      content,
-      createdAt: formatNow(),
-      likes: 0,
-      dislikes: 0,
-      userReaction: null,
-    };
+  const handleAddComment = async (eventId, content) => {
+    const currentEvent = events.find((event) => event.id === eventId);
+    if (!currentEvent) return;
 
-    setEvents((prev) =>
-      prev.map((event) =>
-        event.id !== eventId
-          ? event
-          : {
-              ...event,
-              extendedProps: {
-                ...event.extendedProps,
-                comments: [...event.extendedProps.comments, newComment],
-              },
-            },
-      ),
-    );
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/schedules/${currentEvent.extendedProps.scheduleId}/comments`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            author: user?.name ?? 'unknown',
+            content,
+          }),
+        },
+      );
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.detail || data.message || '댓글을 저장하지 못했습니다.');
+      }
+
+      await loadSchedules();
+    } catch (error) {
+      alert(error.message);
+    }
   };
 
   return (

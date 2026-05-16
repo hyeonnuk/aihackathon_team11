@@ -213,6 +213,19 @@ class ScheduleReactionRequest(BaseModel):
         return self
 
 
+class CommentCreateRequest(BaseModel):
+    author: str = Field(min_length=1, max_length=50)
+    content: str = Field(min_length=1)
+
+    @field_validator("author", "content")
+    @classmethod
+    def strip_comment_text(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("must not be blank")
+        return value
+
+
 def create_database_if_needed() -> None:
     try:
         connection = mysql.connector.connect(
@@ -326,6 +339,25 @@ def init_tables() -> None:
             cursor.execute(
                 "ALTER TABLE schedules ADD COLUMN dislike_count INT UNSIGNED NOT NULL DEFAULT 0 AFTER like_count"
             )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schedule_comments (
+              id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+              schedule_id BIGINT UNSIGNED NOT NULL,
+              author VARCHAR(50) NOT NULL,
+              content TEXT NOT NULL,
+              like_count INT UNSIGNED NOT NULL DEFAULT 0,
+              dislike_count INT UNSIGNED NOT NULL DEFAULT 0,
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+              PRIMARY KEY (id),
+              INDEX idx_schedule_comments_schedule_id (schedule_id),
+              CONSTRAINT fk_schedule_comments_schedule_id
+                FOREIGN KEY (schedule_id) REFERENCES schedules(id)
+                ON DELETE CASCADE
+            )
+            """
+        )
         connection.commit()
     finally:
         cursor.close()
@@ -366,7 +398,41 @@ def serialize_datetime(value):
     return value.isoformat(sep=" ") if value else None
 
 
-def to_schedule_response(row: dict) -> dict:
+def to_comment_response(row: dict) -> dict:
+    return {
+        "id": row["id"],
+        "scheduleId": row["schedule_id"],
+        "author": row["author"],
+        "content": row["content"],
+        "likes": row["like_count"],
+        "dislikes": row["dislike_count"],
+        "createdAt": serialize_datetime(row["created_at"]),
+    }
+
+
+def fetch_comments_by_schedule_ids(cursor, schedule_ids: list[int]) -> dict[int, list[dict]]:
+    if not schedule_ids:
+        return {}
+
+    placeholders = ", ".join(["%s"] * len(schedule_ids))
+    cursor.execute(
+        f"""
+        SELECT id, schedule_id, author, content, like_count, dislike_count, created_at
+        FROM schedule_comments
+        WHERE schedule_id IN ({placeholders})
+        ORDER BY created_at ASC, id ASC
+        """,
+        schedule_ids,
+    )
+    comments_by_schedule_id = {schedule_id: [] for schedule_id in schedule_ids}
+    for comment in cursor.fetchall():
+        comments_by_schedule_id.setdefault(comment["schedule_id"], []).append(
+            to_comment_response(comment)
+        )
+    return comments_by_schedule_id
+
+
+def to_schedule_response(row: dict, comments: list[dict] | None = None) -> dict:
     return {
         "id": row["id"],
         "title": row["title"],
@@ -382,6 +448,7 @@ def to_schedule_response(row: dict) -> dict:
         "author": row["author"],
         "likeCount": row["like_count"],
         "dislikeCount": row["dislike_count"],
+        "comments": comments or [],
         "createdAt": serialize_datetime(row["created_at"]),
         "updatedAt": serialize_datetime(row["updated_at"]),
     }
@@ -546,6 +613,47 @@ def list_signup_users():
     }
 
 
+@app.get("/api/test/schedules/{schedule_id}/comments")
+def list_schedule_comments_for_test(schedule_id: int):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            cursor.execute("SELECT id FROM schedules WHERE id = %s LIMIT 1", (schedule_id,))
+            if cursor.fetchone() is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Schedule not found.",
+                )
+
+            cursor.execute(
+                """
+                SELECT id, schedule_id, author, content, like_count, dislike_count, created_at
+                FROM schedule_comments
+                WHERE schedule_id = %s
+                ORDER BY created_at ASC, id ASC
+                """,
+                (schedule_id,),
+            )
+            comments = cursor.fetchall()
+        finally:
+            cursor.close()
+            connection.close()
+    except HTTPException:
+        raise
+    except mysql.connector.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to load schedule comments.",
+        )
+
+    return {
+        "scheduleId": schedule_id,
+        "count": len(comments),
+        "comments": [to_comment_response(comment) for comment in comments],
+    }
+
+
 @app.get("/api/users/{user_id}")
 def get_user(user_id: int):
     try:
@@ -629,6 +737,10 @@ def list_schedules():
                 """
             )
             schedules = cursor.fetchall()
+            comments_by_schedule_id = fetch_comments_by_schedule_ids(
+                cursor,
+                [schedule["id"] for schedule in schedules],
+            )
         finally:
             cursor.close()
             connection.close()
@@ -640,7 +752,10 @@ def list_schedules():
 
     return {
         "count": len(schedules),
-        "schedules": [to_schedule_response(schedule) for schedule in schedules],
+        "schedules": [
+            to_schedule_response(schedule, comments_by_schedule_id.get(schedule["id"], []))
+            for schedule in schedules
+        ],
     }
 
 
@@ -661,6 +776,10 @@ def get_schedule(schedule_id: int):
                 (schedule_id,),
             )
             schedule = cursor.fetchone()
+            comments_by_schedule_id = fetch_comments_by_schedule_ids(
+                cursor,
+                [schedule["id"]] if schedule else [],
+            )
         finally:
             cursor.close()
             connection.close()
@@ -676,7 +795,7 @@ def get_schedule(schedule_id: int):
             detail="Schedule not found.",
         )
 
-    return {"schedule": to_schedule_response(schedule)}
+    return {"schedule": to_schedule_response(schedule, comments_by_schedule_id.get(schedule["id"], []))}
 
 
 @app.patch("/api/schedules/{schedule_id}/reactions")
@@ -728,6 +847,113 @@ def update_schedule_reactions(schedule_id: int, payload: ScheduleReactionRequest
         "id": schedule_id,
         "likeCount": counts["like_count"],
         "dislikeCount": counts["dislike_count"],
+    }
+
+
+@app.post("/api/schedules/{schedule_id}/comments", status_code=status.HTTP_201_CREATED)
+def create_schedule_comment(schedule_id: int, payload: CommentCreateRequest):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            cursor.execute("SELECT id FROM schedules WHERE id = %s LIMIT 1", (schedule_id,))
+            if cursor.fetchone() is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Schedule not found.",
+                )
+
+            cursor.execute(
+                """
+                INSERT INTO schedule_comments (schedule_id, author, content)
+                VALUES (%s, %s, %s)
+                """,
+                (schedule_id, payload.author, payload.content),
+            )
+            connection.commit()
+            comment_id = cursor.lastrowid
+
+            cursor.execute(
+                """
+                SELECT id, schedule_id, author, content, like_count, dislike_count, created_at
+                FROM schedule_comments
+                WHERE id = %s
+                LIMIT 1
+                """,
+                (comment_id,),
+            )
+            comment = cursor.fetchone()
+        finally:
+            cursor.close()
+            connection.close()
+    except HTTPException:
+        raise
+    except mysql.connector.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create schedule comment.",
+        )
+
+    return {
+        "message": "Schedule comment created.",
+        "comment": to_comment_response(comment),
+    }
+
+
+@app.patch("/api/schedules/{schedule_id}/comments/{comment_id}/reactions")
+def update_schedule_comment_reactions(
+    schedule_id: int,
+    comment_id: int,
+    payload: ScheduleReactionRequest,
+):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            cursor.execute(
+                """
+                UPDATE schedule_comments
+                SET
+                  like_count = GREATEST(CAST(like_count AS SIGNED) + %s, 0),
+                  dislike_count = GREATEST(CAST(dislike_count AS SIGNED) + %s, 0)
+                WHERE id = %s AND schedule_id = %s
+                """,
+                (payload.likeDelta, payload.dislikeDelta, comment_id, schedule_id),
+            )
+            if cursor.rowcount == 0:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Schedule comment not found.",
+                )
+            connection.commit()
+
+            cursor.execute(
+                """
+                SELECT like_count, dislike_count
+                FROM schedule_comments
+                WHERE id = %s AND schedule_id = %s
+                LIMIT 1
+                """,
+                (comment_id, schedule_id),
+            )
+            counts = cursor.fetchone()
+        finally:
+            cursor.close()
+            connection.close()
+    except HTTPException:
+        raise
+    except mysql.connector.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update schedule comment reactions.",
+        )
+
+    return {
+        "message": "Schedule comment reactions updated.",
+        "id": comment_id,
+        "scheduleId": schedule_id,
+        "likes": counts["like_count"],
+        "dislikes": counts["dislike_count"],
     }
 
 
