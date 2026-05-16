@@ -1127,7 +1127,7 @@ export default function Home() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-white">
-      <header className="z-10 flex h-16 shrink-0 items-center justify-between border-b border-gray-100 bg-white px-6">
+      <header className="z-10 flex h-16 shrink-0 items-center justify-between border-b border-gray-200 bg-[#F6F7FB] px-6">
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-500 shadow-sm">
             <span className="text-sm font-extrabold text-white">C</span>
@@ -1154,16 +1154,16 @@ export default function Home() {
               </button>
               <button
                 onClick={() => navigate('/profile')}
-                className="flex items-center gap-2 rounded-full bg-primary-50 px-3 py-1.5 transition-all hover:bg-primary-100 active:scale-95"
+                className="flex items-center gap-2 rounded-full bg-[#EAECF5] py-1.5 pl-1.5 pr-3.5 transition-all hover:bg-[#DDE0EE] active:scale-95"
               >
-                <div className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-primary-200">
+                <div className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-primary-200 shrink-0">
                   {user.profileImage ? (
                     <img src={user.profileImage} alt="프로필" className="h-full w-full object-cover" />
                   ) : (
                     <span className="text-xs font-bold text-primary-600">{user.name?.charAt(0)}</span>
                   )}
                 </div>
-                <span className="text-sm font-semibold text-primary-700">{user.name}님</span>
+                <span className="text-sm font-medium text-primary-700">{user.name}님</span>
               </button>
               <button
                 onClick={handleLogout}
