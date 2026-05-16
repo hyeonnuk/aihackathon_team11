@@ -361,12 +361,14 @@ export default function EventDetailPanel({
   };
 
   const handleInterceptAddReply = (parentId, content) => {
+    const authorName = user?.repBadge ? `${user.repBadge} ${user.name}` : (user?.name || '익명');
+
     setLocalComments(prev => prev.map(c => {
       if (c.id === parentId) {
         const newReply = {
           id: `reply_${Date.now()}`,
           content,
-          author: user?.name || '익명',
+          author: authorName,
           authorId: user?.id,
           createdAt: '방금 전',
           likes: 0,

@@ -245,6 +245,7 @@ export default function DashboardPage() {
                 </div>
                 <span className="text-sm font-semibold text-primary-700">
                   {user.name}님 환영합니다
+                  {user.repBadge ? `${user.repBadge} ` : ''}{user.name}님 환영합니다
                 </span>
               </div>
 
