@@ -1218,6 +1218,14 @@ export default function Home() {
         <div className="flex items-center gap-3">
           {user ? (
             <>
+              {user.role === 'master' && (
+                <button
+                  onClick={() => navigate('/admin/users')}
+                  className="rounded-lg border border-primary-200 bg-white px-3 py-1.5 text-sm font-semibold text-primary-600 transition-all hover:bg-primary-50 active:scale-95"
+                >
+                  권한 관리
+                </button>
+              )}
               <button
                 onClick={() => { setEditTargetMemo(null); setIsMemoModalOpen(true); }}
                 className="flex items-center gap-1.5 rounded-lg border border-primary-200 bg-primary-50 px-4 py-2 text-sm font-semibold text-primary-700 shadow-sm transition-all hover:bg-primary-100 active:scale-95"
