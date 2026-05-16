@@ -20,3 +20,35 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ── 필터 버튼 (📅) 스타일 보정 ─────────────────────────── */
+.fc-filterBtn-button {
+  font-size: 1rem !important;
+  padding: 4px 10px !important;
+  line-height: 1.4 !important;
+}
+
+/* 필터 활성 상태: 필터가 하나라도 걸려 있으면 버튼 강조 */
+.calendar-has-filters .fc-filterBtn-button {
+  background-color: #4f46e5 !important;
+  color: #fff !important;
+  border-color: #4338ca !important;
+}
+
+/* ── 필터 팝업 등장 애니메이션 ──────────────────────────── */
+.calendar-filter-popup {
+  animation: filterPopupIn 0.15s ease-out;
+}
+
+@keyframes filterPopupIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+/* ── 반응형: 소형 화면에서 팝업 전체 너비로 확장 ────────── */
+@media (max-width: 640px) {
+  .calendar-filter-popup {
+    width: calc(100vw - 24px) !important;
+    right: 4px !important;
+  }
+}
