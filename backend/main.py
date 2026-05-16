@@ -454,6 +454,89 @@ def to_schedule_response(row: dict, comments: list[dict] | None = None) -> dict:
     }
 
 
+def to_user_post_response(row: dict) -> dict:
+    return {
+        "id": row["id"],
+        "title": row["title"],
+        "content": row["content"],
+        "startDate": serialize_datetime(row["start_date"]),
+        "endDate": serialize_datetime(row["end_date"]),
+        "createdAt": serialize_datetime(row["created_at"]),
+        "likeCount": row["like_count"],
+        "dislikeCount": row["dislike_count"],
+    }
+
+
+def to_user_comment_response(row: dict) -> dict:
+    return {
+        "id": row["id"],
+        "scheduleId": row["schedule_id"],
+        "postId": row["schedule_id"],
+        "postTitle": row["schedule_title"],
+        "author": row["author"],
+        "content": row["content"],
+        "likes": row["like_count"],
+        "dislikes": row["dislike_count"],
+        "createdAt": serialize_datetime(row["created_at"]),
+    }
+
+
+def load_user_activity(cursor, user_id: int) -> tuple[dict, list[dict], list[dict], dict]:
+    cursor.execute(
+        """
+        SELECT id, name, student_number, gender, phone_number, email,
+               login_id, profile_image
+        FROM users
+        WHERE id = %s
+        LIMIT 1
+        """,
+        (user_id,),
+    )
+    user = cursor.fetchone()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found.",
+        )
+
+    author_names = (user["name"], user["login_id"])
+    cursor.execute(
+        """
+        SELECT id, title, start_date, end_date, content, like_count, dislike_count, created_at
+        FROM schedules
+        WHERE author IN (%s, %s)
+        ORDER BY created_at DESC, id DESC
+        """,
+        author_names,
+    )
+    posts = [to_user_post_response(post) for post in cursor.fetchall()]
+
+    cursor.execute(
+        """
+        SELECT c.id, c.schedule_id, c.author, c.content, c.like_count, c.dislike_count,
+               c.created_at, s.title AS schedule_title
+        FROM schedule_comments c
+        JOIN schedules s ON s.id = c.schedule_id
+        WHERE c.author IN (%s, %s)
+        ORDER BY c.created_at DESC, c.id DESC
+        """,
+        author_names,
+    )
+    comments = [to_user_comment_response(comment) for comment in cursor.fetchall()]
+
+    stats = {
+        "scheduleCount": len(posts),
+        "commentCount": len(comments),
+        "receivedLikesCount": sum(post["likeCount"] for post in posts),
+        "receivedDislikesCount": sum(post["dislikeCount"] for post in posts),
+        "likesCount": 0,
+        "dislikesCount": 0,
+        "hasJoinedHackathon": any("hackathon" in (post["title"] or "").lower() or "해커톤" in (post["title"] or "") for post in posts),
+        "isFirstCommenter": False,
+    }
+    return user, posts, comments, stats
+
+
 @app.on_event("startup")
 def startup() -> None:
     global pool
@@ -660,33 +743,68 @@ def get_user(user_id: int):
         connection = get_connection()
         cursor = connection.cursor(dictionary=True)
         try:
-            cursor.execute(
-                """
-                SELECT id, name, student_number, gender, phone_number, email,
-                       login_id, profile_image
-                FROM users
-                WHERE id = %s
-                LIMIT 1
-                """,
-                (user_id,),
-            )
-            user = cursor.fetchone()
+            user, posts, comments, stats = load_user_activity(cursor, user_id)
         finally:
             cursor.close()
             connection.close()
+    except HTTPException:
+        raise
     except mysql.connector.Error:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to load user.",
         )
 
-    if not user:
+    return {
+        "user": {
+            **to_user_response(user),
+            "posts": posts,
+            "comments": comments,
+            "stats": stats,
+        }
+    }
+
+
+@app.get("/api/users/{user_id}/posts")
+def get_user_posts(user_id: int):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            _, posts, _, _ = load_user_activity(cursor, user_id)
+        finally:
+            cursor.close()
+            connection.close()
+    except HTTPException:
+        raise
+    except mysql.connector.Error:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found.",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to load user posts.",
         )
 
-    return {"user": to_user_response(user)}
+    return {"count": len(posts), "posts": posts}
+
+
+@app.get("/api/users/{user_id}/comments")
+def get_user_comments(user_id: int):
+    try:
+        connection = get_connection()
+        cursor = connection.cursor(dictionary=True)
+        try:
+            _, _, comments, _ = load_user_activity(cursor, user_id)
+        finally:
+            cursor.close()
+            connection.close()
+    except HTTPException:
+        raise
+    except mysql.connector.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to load user comments.",
+        )
+
+    return {"count": len(comments), "comments": comments}
 
 
 @app.put("/api/users/{user_id}/profile-image")
