@@ -180,9 +180,9 @@ export default function DashboardPage() {
         {/* 좌측 로고 */}
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
-            <span className="text-white text-sm font-extrabold">S</span>
+            <span className="text-white text-sm font-extrabold">C</span>
           </div>
-          <span className="text-xl font-extrabold text-gray-800 tracking-tight">Sync-CS</span>
+          <span className="text-xl font-extrabold text-gray-800 tracking-tight">COM:HUB</span>
         </div>
 
         {/* 우측 인증 영역 */}

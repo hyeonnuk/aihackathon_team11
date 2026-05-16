@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Home    from './pages/Home';
 import Login   from './pages/Login';
 import Profile from './pages/Profile';
+import Signup  from './pages/Signup';
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
       <Routes>
         <Route path="/"        element={<Home />}    />
         <Route path="/login"   element={<Login />}   />
+        <Route path="/signup"  element={<Signup />}  />
         <Route path="/profile" element={<Profile />} />
         {/* 정의되지 않은 경로는 홈으로 리다이렉트 */}
         <Route path="*"        element={<Navigate to="/" replace />} />
