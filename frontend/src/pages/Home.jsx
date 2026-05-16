@@ -773,6 +773,16 @@ export default function Home() {
               right: 'dayGridMonth,dayGridWeek filterBtn',
             }}
             buttonText={{ today: '오늘', month: '월별', week: '주별' }}
+            dayCellContent={(arg) => arg.date.getDate()}
+            dayCellClassNames={(arg) => {
+              const d = arg.date;
+              const dateStr = [
+                d.getFullYear(),
+                String(d.getMonth() + 1).padStart(2, '0'),
+                String(d.getDate()).padStart(2, '0'),
+              ].join('-');
+              return dateStr === selectedDate ? ['day-selected'] : [];
+            }}
           />
         </section>
 
