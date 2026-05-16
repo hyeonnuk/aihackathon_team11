@@ -265,6 +265,43 @@ function getDeadlineBadge(applyEndDate) {
   return null;
 }
 
+function buildEditInitialData(event) {
+  const ep = event.extendedProps;
+
+  let gradeValue = 'all';
+  if (ep.grade && ep.grade.length > 0 && ep.grade.length < ALL_GRADES.length) {
+    gradeValue = ep.grade[0].replace('학년', '');
+  }
+
+  let endDateStr = '';
+  if (event.end) {
+    const d = new Date(`${event.end}T00:00:00`);
+    d.setDate(d.getDate() - 1);
+    endDateStr = [
+      d.getFullYear(),
+      String(d.getMonth() + 1).padStart(2, '0'),
+      String(d.getDate()).padStart(2, '0'),
+    ].join('-');
+  }
+
+  const title = event.title.replace(/^\[공지\] /, '');
+
+  return {
+    scheduleId: ep.scheduleId,
+    title,
+    startDate: event.start ? `${event.start}T00:00` : '',
+    endDate: endDateStr ? `${endDateStr}T00:00` : '',
+    content: ep.description || '',
+    photo: ep.photo || null,
+    link: ep.applyLink || '',
+    note: ep.note || '',
+    grade: gradeValue,
+    notice: Boolean(ep.notice),
+    hashtags: ep.tags || [],
+    author: ep.author || '',
+  };
+}
+
 function getReactionUpdate(currentProps, reaction) {
   const nextProps = { ...currentProps };
   const deltas = { likeDelta: 0, dislikeDelta: 0 };
@@ -461,6 +498,8 @@ export default function Home() {
   const [scheduleError, setScheduleError] = useState('');
   const [panelView, setPanelView] = useState('list');
   const [detailEventId, setDetailEventId] = useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editTargetEvent, setEditTargetEvent] = useState(null);
 
   const hasActiveFilters = selectedGrades.length > 0 || selectedTags.length > 0;
 
@@ -537,6 +576,40 @@ export default function Home() {
   const handleBackToList = () => {
     setPanelView('list');
     setDetailEventId(null);
+  };
+
+  const handleOpenEdit = (eventId) => {
+    const event = events.find((e) => e.id === eventId);
+    if (!event) return;
+    setEditTargetEvent(event);
+    setIsEditModalOpen(true);
+  };
+
+  const handleDeleteEvent = async (eventId) => {
+    const event = events.find((e) => e.id === eventId);
+    if (!event) return;
+    if (!window.confirm('이 일정을 삭제하시겠습니까?')) return;
+
+    const scheduleId = event.extendedProps.scheduleId;
+
+    setEvents((prev) => prev.filter((e) => e.id !== eventId));
+    handleBackToList();
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/schedules/${scheduleId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.detail || data.message || '삭제에 실패했습니다.');
+      }
+    } catch (error) {
+      setEvents((prev) => {
+        const stillAbsent = !prev.find((e) => e.id === eventId);
+        return stillAbsent ? [...prev, event] : prev;
+      });
+      alert(`일정 삭제 실패\n${error.message}`);
+    }
   };
 
   const handleEventReaction = async (eventId, reaction) => {
@@ -777,6 +850,16 @@ export default function Home() {
               right: 'dayGridMonth,dayGridWeek filterBtn',
             }}
             buttonText={{ today: '오늘', month: '월별', week: '주별' }}
+            dayCellContent={(arg) => arg.date.getDate()}
+            dayCellClassNames={(arg) => {
+              const d = arg.date;
+              const dateStr = [
+                d.getFullYear(),
+                String(d.getMonth() + 1).padStart(2, '0'),
+                String(d.getDate()).padStart(2, '0'),
+              ].join('-');
+              return dateStr === selectedDate ? ['day-selected'] : [];
+            }}
           />
         </section>
 
@@ -828,6 +911,8 @@ export default function Home() {
                 handleCommentReaction(detailEventId, commentId, reaction)
               }
               onAddComment={(content) => handleAddComment(detailEventId, content)}
+              onEdit={user ? () => handleOpenEdit(detailEventId) : undefined}
+              onDelete={user ? () => handleDeleteEvent(detailEventId) : undefined}
               user={user}
             />
           ) : null}
@@ -838,6 +923,15 @@ export default function Home() {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onCreated={loadSchedules}
+      />
+
+      <EventAddModal
+        key={editTargetEvent?.id ?? 'edit-modal'}
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onCreated={() => { loadSchedules(); setIsEditModalOpen(false); }}
+        mode="edit"
+        initialData={editTargetEvent ? buildEditInitialData(editTargetEvent) : null}
       />
     </div>
   );
