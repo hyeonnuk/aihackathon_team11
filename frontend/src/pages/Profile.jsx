@@ -31,7 +31,12 @@ const MY_COMMENTS = [
 ];
 
 // 더미 뱃지
-const BADGES = ['웹 해커톤 참가자', '알고리즘 스터디', 'ML 부트캠프'];
+const BADGES = [
+  { id: 1, label: '웹 해커톤 참가자', icon: '💻', style: 'bg-blue-50 text-blue-700 border-blue-200 ring-blue-100' },
+  { id: 2, label: '알고리즘 스터디', icon: '🧠', style: 'bg-amber-50 text-amber-700 border-amber-200 ring-amber-100' },
+  { id: 3, label: 'ML 부트캠프', icon: '🤖', style: 'bg-emerald-50 text-emerald-700 border-emerald-200 ring-emerald-100' },
+  { id: 4, label: '열정 네트워커', icon: '🔥', style: 'bg-rose-50 text-rose-700 border-rose-200 ring-rose-100' },
+];
 
 // ── Profile: 프로필 페이지 컴포넌트 (export default) ─────────
 export default function Profile() {
@@ -155,12 +160,13 @@ export default function Profile() {
           <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-2">뱃지</p>
           <div className="flex flex-wrap gap-2">
             {BADGES.map((badge) => (
-              <span
-                key={badge}
-                className="px-3 py-1 bg-indigo-50 text-indigo-600 text-xs font-semibold rounded-full border border-indigo-100"
+              <div
+                key={badge.id}
+                className={`flex items-center gap-1.5 px-3 py-1.5 border shadow-sm rounded-full cursor-default hover:ring-4 transition-all duration-200 ${badge.style}`}
               >
-                {badge}
-              </span>
+                <span className="text-sm">{badge.icon}</span>
+                <span className="text-xs font-extrabold">{badge.label}</span>
+              </div>
             ))}
           </div>
 
