@@ -80,6 +80,19 @@
   padding: 0.6rem 0;
 }
 
+/* 일요일 + 공휴일 — 연한 붉은색 */
+.fc .fc-day-sun .fc-col-header-cell-cushion,
+.fc .fc-day-sun .fc-daygrid-day-number,
+.fc .holiday-kr .fc-daygrid-day-number {
+  color: #f87171 !important;
+}
+
+/* 토요일 — 연한 파란색 */
+.fc .fc-day-sat .fc-col-header-cell-cushion,
+.fc .fc-day-sat .fc-daygrid-day-number {
+  color: #60a5fa !important;
+}
+
 /* 날짜 숫자 */
 .fc .fc-daygrid-day-number {
   font-size: 0.8rem;
