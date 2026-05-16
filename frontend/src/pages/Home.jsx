@@ -1084,6 +1084,14 @@ export default function Home() {
         <div className="flex items-center gap-3">
           {user ? (
             <>
+              {user.role === 'master' && (
+                <button
+                  onClick={() => navigate('/admin/users')}
+                  className="rounded-lg border border-primary-200 bg-white px-3 py-1.5 text-sm font-semibold text-primary-600 transition-all hover:bg-primary-50 active:scale-95"
+                >
+                  권한 관리
+                </button>
+              )}
               <button
                 onClick={() => setIsAddModalOpen(true)}
                 className="flex items-center gap-1.5 rounded-lg bg-primary-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-primary-600 active:scale-95"
