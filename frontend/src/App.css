@@ -175,6 +175,13 @@
   font-weight: 600;
 }
 
+/* 오늘 버튼 — 오늘 날짜를 보고 있을 때 활성화 스타일 */
+.calendar-viewing-today .fc-todayBtn-button {
+  background: #dce8ff !important;
+  border-color: #b8d0ff !important;
+  color: #4f7cff !important;
+}
+
 /* 필터 버튼 */
 .fc-filterBtn-button {
   font-size: 1rem !important;

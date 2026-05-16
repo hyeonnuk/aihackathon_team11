@@ -706,6 +706,7 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState(getTodayStr);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [viewingToday, setViewingToday] = useState(true);
   const [selectedGrades, setSelectedGrades] = useState([]);
   const [selectedTags, setSelectedTags] = useState([]);
   const [showNoticeOnly, setShowNoticeOnly] = useState(false);
@@ -1058,7 +1059,7 @@ export default function Home() {
         <section
           className={`relative overflow-y-auto bg-white p-5 ${
             hasActiveFilters ? 'calendar-has-filters' : ''
-          }`}
+          } ${selectedDate === getTodayStr() ? 'calendar-viewing-today' : ''}`}
           style={{ flex: '7 7 0' }}
         >
           {isFilterOpen && (
@@ -1111,6 +1112,17 @@ export default function Home() {
               right: 'dayGridMonth,dayGridWeek filterBtn',
             }}
             buttonText={{ month: '월별', week: '주별' }}
+            datesSet={(info) => {
+              const today = getTodayStr();
+              setViewingToday(today >= info.startStr.slice(0, 10) && today < info.endStr.slice(0, 10));
+            }}
+            dayHeaderContent={(arg) => {
+              if (arg.view.type === 'dayGridWeek') {
+                const d = arg.date;
+                return `${d.getDate()}일(${DAY_NAMES[d.getDay()]})`;
+              }
+              return arg.text;
+            }}
             dayCellContent={(arg) => arg.date.getDate()}
             dayCellClassNames={(arg) => {
               const d = arg.date;
