@@ -153,16 +153,17 @@ export default function EventAddModal({ isOpen, onClose, onCreated }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
       onClick={resetAndClose}
     >
       <div
-        className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl"
+        className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl border border-gray-100"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-6 py-4">
           <div>
-            <h2 className="text-lg font-extrabold text-gray-800">새 일정 등록</h2>
+            <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-1">새 일정</p>
+            <h2 className="text-lg font-extrabold text-gray-800 leading-tight">새 일정 등록</h2>
             <p className="mt-0.5 text-xs text-gray-400">작성한 일정은 캘린더에 표시됩니다.</p>
           </div>
           <button
@@ -170,7 +171,7 @@ export default function EventAddModal({ isOpen, onClose, onCreated }) {
             onClick={resetAndClose}
             className="flex h-8 w-8 items-center justify-center rounded-full text-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
           >
-            x
+            ✕
           </button>
         </div>
 

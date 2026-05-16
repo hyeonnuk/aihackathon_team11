@@ -1,41 +1,159 @@
-/* App.css — 전역 커스텀 스타일 (Tailwind CSS 보완용) */
+/* App.css — FullCalendar 스타일 오버라이드 */
 
-/* FullCalendar 타이틀 폰트 조정 */
+/* 툴바 타이틀 */
 .fc .fc-toolbar-title {
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 700;
-  color: #1f2937;
+  color: #1e293b;
+  letter-spacing: -0.01em;
 }
 
-/* 이벤트 클릭 시 포커스 아웃라인 제거 */
+/* 버튼 공통 */
+.fc .fc-button {
+  background: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #64748b !important;
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
+  padding: 0.35rem 0.9rem !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  transition: all 0.15s ease !important;
+  line-height: 1.5 !important;
+}
+
+.fc .fc-button:hover {
+  background: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+.fc .fc-button:focus {
+  box-shadow: 0 0 0 3px #e0e7ff !important;
+  outline: none !important;
+}
+
+/* 활성 뷰 버튼 */
+.fc .fc-button-primary:not(:disabled).fc-button-active,
+.fc .fc-button-primary:not(:disabled):active {
+  background: #eef2ff !important;
+  border-color: #c7d2fe !important;
+  color: #4f46e5 !important;
+}
+
+/* 이벤트 블록 */
+.fc .fc-event {
+  border-radius: 6px !important;
+  border: none !important;
+  padding: 2px 6px !important;
+  cursor: pointer !important;
+  opacity: 0.92;
+}
+
+.fc .fc-event:hover {
+  opacity: 1;
+  filter: brightness(1.05);
+}
+
 .fc .fc-event:focus {
-  box-shadow: none;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
-/* 이벤트 텍스트 줄임 처리 */
 .fc .fc-event-title {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* ── 필터 버튼 (📅) 스타일 보정 ─────────────────────────── */
+/* 요일 헤더 */
+.fc .fc-col-header-cell-cushion {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-decoration: none !important;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.6rem 0;
+}
+
+/* 날짜 숫자 */
+.fc .fc-daygrid-day-number {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #64748b;
+  text-decoration: none !important;
+  padding: 6px 8px;
+}
+
+/* 오늘 날짜 셀 */
+.fc .fc-day-today {
+  background-color: #f5f3ff !important;
+}
+
+.fc .fc-day-today .fc-daygrid-day-number {
+  background: #4f46e5;
+  color: white !important;
+  border-radius: 50%;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-weight: 700;
+}
+
+/* 그리드 테두리 */
+.fc .fc-scrollgrid {
+  border: none !important;
+}
+
+.fc .fc-scrollgrid-section > td {
+  border: none !important;
+}
+
+.fc td, .fc th {
+  border-color: #f1f5f9 !important;
+}
+
+/* 툴바 여백 */
+.fc .fc-toolbar.fc-header-toolbar {
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+/* 버튼 그룹 */
+.fc .fc-toolbar-chunk {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* More 링크 */
+.fc .fc-more-link {
+  font-size: 0.7rem;
+  color: #6366f1;
+  font-weight: 600;
+}
+
+/* 필터 버튼 */
 .fc-filterBtn-button {
   font-size: 1rem !important;
   padding: 4px 10px !important;
   line-height: 1.4 !important;
 }
 
-/* 필터 활성 상태: 필터가 하나라도 걸려 있으면 버튼 강조 */
 .calendar-has-filters .fc-filterBtn-button {
   background-color: #4f46e5 !important;
   color: #fff !important;
   border-color: #4338ca !important;
 }
 
-/* ── 필터 팝업 등장 애니메이션 ──────────────────────────── */
+/* 필터 팝업 애니메이션 */
 .calendar-filter-popup {
   animation: filterPopupIn 0.15s ease-out;
 }
@@ -45,7 +163,6 @@
   to   { opacity: 1; transform: translateY(0);    }
 }
 
-/* ── 반응형: 소형 화면에서 팝업 전체 너비로 확장 ────────── */
 @media (max-width: 640px) {
   .calendar-filter-popup {
     width: calc(100vw - 24px) !important;

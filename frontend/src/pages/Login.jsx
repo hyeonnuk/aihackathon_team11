@@ -48,66 +48,99 @@ export default function Login() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-indigo-50 via-white to-blue-50 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-xl">
-        <div className="mb-8 flex items-center justify-center gap-2.5">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 shadow-md">
-            <span className="text-base font-extrabold text-white">C</span>
+    <div className="flex min-h-screen bg-slate-50">
+      {/* 왼쪽 브랜드 패널 */}
+      <div className="hidden lg:flex lg:w-[420px] shrink-0 bg-indigo-600 flex-col justify-between p-10">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center">
+            <span className="text-white text-sm font-extrabold">C</span>
           </div>
-          <span className="text-2xl font-extrabold tracking-tight text-gray-800">COM:HUB</span>
+          <span className="text-white text-base font-extrabold tracking-tight">COM:HUB</span>
         </div>
 
-        <div className="mb-8 text-center">
-          <h1 className="text-xl font-bold text-gray-800">로그인</h1>
-          <p className="mt-1.5 text-sm text-gray-400">아이디와 비밀번호로 접속하세요</p>
+        <div>
+          <h2 className="text-3xl font-extrabold text-white leading-snug mb-3">
+            일정을 함께<br />관리하세요
+          </h2>
+          <p className="text-indigo-200 text-sm leading-relaxed">
+            COM:HUB로 학교 일정, 스터디, 공모전 등<br />
+            모든 활동을 한눈에 확인하세요.
+          </p>
         </div>
 
-        <form onSubmit={handleLogin} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-gray-600">아이디</label>
-            <input
-              type="text"
-              value={loginId}
-              onChange={(event) => setLoginId(event.target.value)}
-              placeholder="아이디를 입력하세요"
-              autoComplete="username"
-              className="rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-800 placeholder-gray-300 transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            />
-          </div>
+        <div className="flex gap-2">
+          {['해커톤', '스터디', '공모전', '장학'].map((tag) => (
+            <span key={tag} className="px-3 py-1 bg-white/10 text-white/80 text-xs font-medium rounded-full">
+              #{tag}
+            </span>
+          ))}
+        </div>
+      </div>
 
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold text-gray-600">비밀번호</label>
-              <span className="text-xs text-gray-400">8자 이상</span>
+      {/* 오른쪽 로그인 폼 */}
+      <div className="flex flex-1 items-center justify-center p-8">
+        <div className="w-full max-w-sm">
+          {/* 모바일용 로고 */}
+          <div className="flex lg:hidden items-center gap-2.5 mb-8">
+            <div className="w-8 h-8 bg-indigo-600 rounded-xl flex items-center justify-center shadow-sm">
+              <span className="text-white text-sm font-extrabold">C</span>
             </div>
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="비밀번호를 입력하세요"
-              autoComplete="current-password"
-              className="rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-800 placeholder-gray-300 transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-indigo-400"
-            />
+            <span className="text-lg font-extrabold text-gray-800 tracking-tight">COM:HUB</span>
           </div>
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="mt-2 w-full rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-indigo-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-indigo-300"
-          >
-            {isSubmitting ? '로그인 중...' : '로그인'}
-          </button>
-        </form>
+          <div className="mb-8">
+            <p className="text-xs font-bold text-indigo-500 uppercase tracking-widest mb-2">로그인</p>
+            <h1 className="text-2xl font-extrabold text-gray-800 leading-tight">다시 오신 것을<br />환영합니다</h1>
+            <p className="mt-2 text-sm text-gray-400">아이디와 비밀번호로 접속하세요</p>
+          </div>
 
-        <div className="mt-6 flex items-center justify-center gap-2 text-sm">
-          <span className="text-gray-400">계정이 없으신가요?</span>
-          <button
-            type="button"
-            onClick={() => navigate('/signup')}
-            className="font-semibold text-indigo-600 hover:text-indigo-700"
-          >
-            회원가입
-          </button>
+          <form onSubmit={handleLogin} className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-gray-600">아이디</label>
+              <input
+                type="text"
+                value={loginId}
+                onChange={(event) => setLoginId(event.target.value)}
+                placeholder="아이디를 입력하세요"
+                autoComplete="username"
+                className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 placeholder-gray-300 shadow-sm transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-gray-600">비밀번호</label>
+                <span className="text-xs text-gray-400">8자 이상</span>
+              </div>
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="비밀번호를 입력하세요"
+                autoComplete="current-password"
+                className="rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 placeholder-gray-300 shadow-sm transition focus:border-transparent focus:outline-none focus:ring-2 focus:ring-indigo-400"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="mt-2 w-full rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-indigo-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-indigo-300"
+            >
+              {isSubmitting ? '로그인 중...' : '로그인'}
+            </button>
+          </form>
+
+          <div className="mt-6 flex items-center justify-center gap-2 text-sm">
+            <span className="text-gray-400">계정이 없으신가요?</span>
+            <button
+              type="button"
+              onClick={() => navigate('/signup')}
+              className="font-semibold text-indigo-600 hover:text-indigo-700"
+            >
+              회원가입
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -25,7 +25,32 @@ const MY_COMMENTS = [
   },
 ];
 
-const BADGES = ['해커톤 참가', '알고리즘 스터디', 'ML Bootcamp'];
+const BADGES = [
+  {
+    id: 1,
+    label: '해커톤 참가',
+    icon: 'H',
+    style: 'bg-blue-50 text-blue-700 border-blue-200 ring-blue-100',
+  },
+  {
+    id: 2,
+    label: '알고리즘 스터디',
+    icon: 'A',
+    style: 'bg-amber-50 text-amber-700 border-amber-200 ring-amber-100',
+  },
+  {
+    id: 3,
+    label: 'ML Bootcamp',
+    icon: 'M',
+    style: 'bg-emerald-50 text-emerald-700 border-emerald-200 ring-emerald-100',
+  },
+  {
+    id: 4,
+    label: '일정 스타터',
+    icon: 'S',
+    style: 'bg-rose-50 text-rose-700 border-rose-200 ring-rose-100',
+  },
+];
 
 function getStoredUser() {
   try {
@@ -117,18 +142,18 @@ export default function Profile() {
   if (!user) return null;
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-6">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-6">
       <div className="mb-4 w-full max-w-lg">
         <button
           onClick={() => navigate('/')}
-          className="text-sm text-gray-500 transition-colors hover:text-indigo-600"
+          className="text-sm font-medium text-gray-400 transition-colors hover:text-indigo-600"
         >
           대시보드로 돌아가기
         </button>
       </div>
 
-      <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-md">
-        <div className="h-24 bg-gradient-to-r from-indigo-500 to-blue-500" />
+      <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+        <div className="h-24 bg-gradient-to-r from-indigo-500 to-violet-500" />
 
         <div className="px-6 pb-6">
           <div className="-mt-10 mb-4 flex items-end justify-between">
@@ -163,47 +188,57 @@ export default function Profile() {
           <p className="mt-1 text-xs text-gray-400">
             학번: {user.studentNumber || '학번 정보 없음'}
           </p>
+
           <div className="my-5 h-px bg-gray-100" />
 
-          <h2 className="mb-3 text-sm font-bold text-gray-700">획득한 배지</h2>
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-indigo-500">
+            배지
+          </p>
           <div className="flex flex-wrap gap-2">
             {BADGES.map((badge) => (
-              <span
-                key={badge}
-                className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600"
+              <div
+                key={badge.id}
+                className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 shadow-sm transition-all duration-200 hover:ring-4 ${badge.style}`}
               >
-                {badge}
-              </span>
+                <span className="text-xs font-extrabold">{badge.icon}</span>
+                <span className="text-xs font-extrabold">{badge.label}</span>
+              </div>
             ))}
           </div>
 
           <div className="my-5 h-px bg-gray-100" />
 
-          <h2 className="mb-3 text-sm font-bold text-gray-700">본인이 쓴 글</h2>
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-indigo-500">
+            작성한 글
+          </p>
           <div className="mb-5 flex flex-col gap-2">
             {MY_POSTS.map((post) => (
               <button
                 key={post.id}
                 type="button"
                 onClick={() => navigate(`/post/${post.id}`)}
-                className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-left transition-colors hover:bg-gray-100"
+                className="rounded-xl border border-gray-100 bg-slate-50 p-3 text-left transition-all hover:border-indigo-200 hover:bg-indigo-50/30"
               >
-                <p className="text-sm font-semibold text-gray-800">{post.title}</p>
+                <p className="text-sm font-semibold text-gray-700">{post.title}</p>
                 <p className="mt-1 text-xs text-gray-400">{post.date}</p>
               </button>
             ))}
           </div>
 
-          <h2 className="mb-3 text-sm font-bold text-gray-700">본인이 쓴 댓글</h2>
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-indigo-500">
+            작성한 댓글
+          </p>
           <div className="flex flex-col gap-2">
             {MY_COMMENTS.map((comment) => (
               <button
                 key={comment.id}
                 type="button"
                 onClick={() => navigate(`/post/${comment.postId}`)}
-                className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-left transition-colors hover:bg-gray-100"
+                className="rounded-xl border border-gray-100 bg-slate-50 p-3 text-left transition-all hover:border-indigo-200 hover:bg-indigo-50/30"
               >
-                <p className="mb-1 text-xs font-medium text-indigo-600">원문: {comment.postTitle}</p>
+                <p className="mb-1 text-xs font-medium text-indigo-500">
+                  원문: {comment.postTitle}
+                </p>
                 <p className="text-sm text-gray-700">{comment.content}</p>
                 <p className="mt-1 text-xs text-gray-400">{comment.date}</p>
               </button>
