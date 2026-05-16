@@ -340,32 +340,11 @@ export default function EventDetailPanel({
 }) {
   const [commentText, setCommentText] = useState('');
   const ep = event.extendedProps;
-  const [prevEventId, setPrevEventId] = useState(event.id);
-
-  const [localComments, setLocalComments] = useState(() => {
-    try {
-      const stored = localStorage.getItem(`comments_${event.id}`);
-      return stored ? JSON.parse(stored) : (ep.comments || []);
-    } catch {
-      return ep.comments || [];
-    }
-  });
-
-  // 이벤트가 변경되었을 때 다른 일정의 댓글로 덮어씌워지는 것을 방지 (즉시 동기화)
-  if (event.id !== prevEventId) {
-    setPrevEventId(event.id);
-    setCommentText(''); // 입력 중이던 댓글 초기화
-    try {
-      const stored = localStorage.getItem(`comments_${event.id}`);
-      setLocalComments(stored ? JSON.parse(stored) : (ep.comments || []));
-    } catch {
-      setLocalComments(ep.comments || []);
-    }
-  }
-
+  const [localComments, setLocalComments] = useState(ep.comments || []);
   useEffect(() => {
-    localStorage.setItem(`comments_${event.id}`, JSON.stringify(localComments));
-  }, [localComments, event.id]);
+    setCommentText('');
+    setLocalComments(ep.comments || []);
+  }, [event.id, ep.comments]);
 
   // 하위 컴포넌트 이벤트 래핑(Intercept) : 부모의 로컬 상태(저장소)를 업데이트하기 위함
   const handleInterceptEditComment = (id, content) => {
@@ -458,6 +437,7 @@ export default function EventDetailPanel({
     const text = commentText.trim();
     if (!text) return;
 
+    /*
     const newComment = {
       id: `comment_${Date.now()}`,
       content: text,
@@ -469,6 +449,7 @@ export default function EventDetailPanel({
       replies: [],
     };
     setLocalComments((prev) => [...prev, newComment]);
+    */
 
     if (onAddComment) onAddComment(text);
     setCommentText('');
