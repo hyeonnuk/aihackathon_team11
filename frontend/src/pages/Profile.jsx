@@ -262,8 +262,11 @@ export default function Profile() {
       <div className="mb-4 w-full max-w-lg">
         <button
           onClick={() => navigate('/')}
-          className="text-sm font-medium text-gray-400 transition-colors hover:text-primary-500"
+          className="flex items-center gap-1 text-sm font-medium text-gray-400 transition-colors hover:text-primary-500"
         >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 19l-7-7 7-7" />
+          </svg>
           대시보드로 돌아가기
         </button>
       </div>
